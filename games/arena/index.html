@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Arena" />
+    <meta name="theme-color" content="#0a1128" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
+    <title>Arena</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #0a1128;
+        color: #f4f4f6;
+        font-family: -apple-system, system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        touch-action: none;
+        z-index: 0;
+      }
+
+      /* --- HUD ------------------------------------------------------------ */
+      #arena-hud {
+        position: fixed;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        left: calc(env(safe-area-inset-left, 0px) + 14px);
+        right: calc(env(safe-area-inset-right, 0px) + 14px);
+        display: none;
+        flex-direction: column;
+        gap: 7px;
+        pointer-events: none;
+      }
+      .arena-hud-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        color: rgba(244, 244, 246, 0.85);
+      }
+      #arena-xp-track {
+        flex: 1;
+        height: 7px;
+        border-radius: 4px;
+        background: rgba(202, 240, 248, 0.16);
+        overflow: hidden;
+      }
+      #arena-xp-fill {
+        width: 0%;
+        height: 100%;
+        border-radius: 4px;
+        background: #caf0f8;
+        box-shadow: 0 0 8px rgba(202, 240, 248, 0.7);
+      }
+      #arena-hp-track {
+        width: 170px;
+        height: 9px;
+        margin: 0 auto;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+      #arena-hp-fill {
+        width: 100%;
+        height: 100%;
+        border-radius: 5px;
+        background: #ff9f1c;
+      }
+
+      /* --- Wave banner ------------------------------------------------------ */
+      #arena-wave-banner {
+        position: fixed;
+        z-index: 10;
+        top: 28%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 40px;
+        font-weight: 800;
+        color: #caf0f8;
+        text-shadow: 0 0 18px rgba(202, 240, 248, 0.6);
+        opacity: 0;
+        pointer-events: none;
+      }
+      #arena-wave-banner.show {
+        animation: arenaWaveIn 1.6s ease-out;
+      }
+      @keyframes arenaWaveIn {
+        0% { opacity: 0; transform: scale(0.8); }
+        15% { opacity: 1; transform: scale(1.06); }
+        30% { transform: scale(1); }
+        70% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+
+      /* --- Joystick --------------------------------------------------------- */
+      #arena-stick-base,
+      #arena-stick-knob {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 12;
+        display: none;
+        pointer-events: none;
+        border-radius: 50%;
+      }
+      #arena-stick-base {
+        width: 108px;
+        height: 108px;
+        border: 2px solid rgba(202, 240, 248, 0.35);
+        background: rgba(202, 240, 248, 0.06);
+      }
+      #arena-stick-knob {
+        width: 44px;
+        height: 44px;
+        background: rgba(202, 240, 248, 0.45);
+      }
+
+      /* --- Full-screen feedback --------------------------------------------- */
+      #arena-damage-vignette {
+        position: fixed;
+        inset: 0;
+        z-index: 15;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(255, 40, 40, 0) 55%,
+          rgba(255, 40, 40, 0.55) 100%
+        );
+      }
+      #arena-levelup-flash {
+        position: fixed;
+        inset: 0;
+        z-index: 15;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(202, 240, 248, 0.35) 0%,
+          rgba(202, 240, 248, 0) 70%
+        );
+      }
+
+      /* --- Overlays ----------------------------------------------------------- */
+      #arena-game-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px
+          calc(env(safe-area-inset-bottom, 0px) + 16px);
+        text-align: center;
+        background: rgba(10, 17, 40, 0.55);
+        pointer-events: none;
+      }
+      #arena-game-overlay h1 {
+        font-size: 42px;
+        font-weight: 800;
+        text-shadow: 0 0 24px rgba(202, 240, 248, 0.35);
+      }
+      #arena-game-overlay p {
+        font-size: 18px;
+        font-weight: 600;
+        color: rgba(244, 244, 246, 0.85);
+      }
+
+      #arena-upgrade-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px
+          calc(env(safe-area-inset-bottom, 0px) + 16px);
+        background: rgba(10, 17, 40, 0.7);
+      }
+      #arena-upgrade-overlay h2 {
+        font-size: 26px;
+        font-weight: 800;
+        margin-bottom: 8px;
+        color: #caf0f8;
+        text-shadow: 0 0 16px rgba(202, 240, 248, 0.5);
+      }
+      #arena-upgrade-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .arena-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: min(340px, 86vw);
+        padding: 14px 18px;
+        border-radius: 16px;
+        border: 2px solid rgba(202, 240, 248, 0.85);
+        background: rgba(28, 37, 65, 0.92);
+        color: #f4f4f6;
+        font: inherit;
+        text-align: left;
+        box-shadow: 0 0 20px rgba(202, 240, 248, 0.25);
+        opacity: 0;
+        animation: arenaCardIn 0.3s ease-out forwards;
+      }
+      .arena-card:active {
+        transform: scale(0.97);
+      }
+      @keyframes arenaCardIn {
+        from { opacity: 0; transform: translateY(24px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .arena-card-icon {
+        font-size: 30px;
+      }
+      .arena-card-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .arena-card-text strong {
+        font-size: 18px;
+      }
+      .arena-card-text small {
+        font-size: 13px;
+        color: rgba(244, 244, 246, 0.7);
+      }
+
+      #arena-build-stamp {
+        position: fixed;
+        z-index: 10;
+        right: calc(env(safe-area-inset-right, 0px) + 8px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+        font-size: 10px;
+        color: rgba(244, 244, 246, 0.4);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="arena-hud">
+      <div class="arena-hud-row">
+        <span id="arena-level-label">Lv 1</span>
+        <div id="arena-xp-track"><div id="arena-xp-fill"></div></div>
+        <span id="arena-wave-label">Wave 1</span>
+      </div>
+      <div id="arena-hp-track"><div id="arena-hp-fill"></div></div>
+    </div>
+    <div id="arena-wave-banner"></div>
+    <div id="arena-stick-base"></div>
+    <div id="arena-stick-knob"></div>
+    <div id="arena-damage-vignette"></div>
+    <div id="arena-levelup-flash"></div>
+    <div id="arena-build-stamp"></div>
+    <div id="arena-upgrade-overlay">
+      <h2>Level up!</h2>
+      <div id="arena-upgrade-cards"></div>
+    </div>
+    <div id="arena-game-overlay"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

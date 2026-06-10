@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@games-lab/shared": "workspace:*",
     "three": "^0.177.0"
   },
   "devDependencies": {

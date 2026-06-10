@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createOrthoApp, startGameLoop } from '@games-lab/shared';
 
 declare const __BUILD_INFO__: string; // injected by vite.config.ts `define`
 
@@ -69,13 +70,9 @@ const COLORS = {
 type GameState = 'ready' | 'playing' | 'gameover';
 
 // --- Renderer / scene / camera / lights ---------------------------------------
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setClearColor(COLORS.skyTopDay);
-document.body.appendChild(renderer.domElement);
-
-const scene = new THREE.Scene();
-const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 30);
-camera.position.z = 5;
+const app = createOrthoApp({ worldHeight: WORLD_HEIGHT, clearColor: COLORS.skyTopDay });
+const { renderer, scene, camera } = app;
+app.onResize = () => layoutScenery();
 
 // No shadow maps — too expensive on mobile; the light angle alone sells the 3D.
 const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -83,26 +80,8 @@ dirLight.position.set(3, 5, 6);
 const ambientLight = new THREE.AmbientLight(COLORS.ambientDay, 0.7);
 scene.add(dirLight, ambientLight);
 
-let worldWidth = WORLD_HEIGHT; // recomputed on resize
 const groundY = -WORLD_HEIGHT / 2 + GROUND_HEIGHT; // top edge of the ground
 const ceilingY = WORLD_HEIGHT / 2;
-
-function resize(): void {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(w, h);
-  const aspect = w / h;
-  worldWidth = WORLD_HEIGHT * aspect;
-  camera.left = -worldWidth / 2;
-  camera.right = worldWidth / 2;
-  camera.top = WORLD_HEIGHT / 2;
-  camera.bottom = -WORLD_HEIGHT / 2;
-  camera.updateProjectionMatrix();
-  layoutScenery();
-}
-window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', resize);
 
 // --- Canvas texture helpers -----------------------------------------------------
 // Runtime-generated textures only — the repo stays asset-free.
@@ -260,7 +239,7 @@ grass.position.set(0, groundY - GRASS_HEIGHT / 2, 0);
 scene.add(grass);
 
 function layoutScenery(): void {
-  const w = worldWidth + 2;
+  const w = app.worldWidth + 2;
   sky.scale.set(w, WORLD_HEIGHT + 2, 1);
   hills.scale.set(w, HILLS_HEIGHT, 1);
   hillsTex.repeat.x = w / HILLS_TILE_WIDTH;
@@ -550,7 +529,7 @@ function startGame(): void {
   state = 'playing';
   overlayEl.style.display = 'none';
   scoreEl.style.display = 'block';
-  spawnPipePair(worldWidth / 2 + PIPE_SPACING);
+  spawnPipePair(app.worldWidth / 2 + PIPE_SPACING);
   birdVelocity = FLAP_IMPULSE;
   timeSinceFlap = 0;
 }
@@ -585,10 +564,6 @@ window.addEventListener('pointerdown', (e) => {
     startGame();
   }
 });
-
-// Block double-tap zoom / scroll gestures Safari might still attempt.
-document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 // --- Collisions -------------------------------------------------------------------
 function aabbOverlap(
@@ -626,7 +601,6 @@ function checkCollisions(): boolean {
 }
 
 // --- Game loop ------------------------------------------------------------------
-let lastTime = performance.now();
 let elapsed = 0;
 
 function update(dt: number): void {
@@ -651,13 +625,13 @@ function update(dt: number): void {
 
   // Despawn off-screen pairs, spawn new ones at a fixed spacing.
   pipes = pipes.filter((pair) => {
-    if (pair.x < -worldWidth / 2 - PIPE_WIDTH) {
+    if (pair.x < -app.worldWidth / 2 - PIPE_WIDTH) {
       scene.remove(pair.top, pair.bottom);
       return false;
     }
     return true;
   });
-  const spawnX = worldWidth / 2 + PIPE_WIDTH;
+  const spawnX = app.worldWidth / 2 + PIPE_WIDTH;
   const lastPipe = pipes[pipes.length - 1];
   if (!lastPipe || lastPipe.x <= spawnX - PIPE_SPACING) {
     spawnPipePair(lastPipe ? lastPipe.x + PIPE_SPACING : spawnX);
@@ -707,15 +681,6 @@ function updateVisuals(dt: number): void {
   }
 }
 
-function frame(now: number): void {
-  const dt = Math.min((now - lastTime) / 1000, MAX_DT);
-  lastTime = now;
-  updateVisuals(dt);
-  update(dt);
-  renderer.render(scene, camera);
-  requestAnimationFrame(frame);
-}
-
 showOverlay([
   'Flappy',
   ...(highScore > 0 ? [`Best: ${highScore}`] : []),
@@ -725,5 +690,9 @@ showOverlay([
 
 (document.getElementById('flappy-build-stamp') as HTMLDivElement).textContent = __BUILD_INFO__;
 
-resize();
-requestAnimationFrame(frame);
+layoutScenery();
+startGameLoop((dt) => {
+  updateVisuals(dt);
+  update(dt);
+  renderer.render(scene, camera);
+}, MAX_DT);

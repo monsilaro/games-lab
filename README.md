@@ -21,6 +21,7 @@ From prompt to playable build on device in about a minute.
 |Game  |Description                 |Play                                              |
 |------|----------------------------|--------------------------------------------------|
 |Flappy|Tap-to-flap, dodge the pipes|[▶️](https://monsilaro.github.io/games-lab/flappy/)|
+|Arena |Survivors-like under the aurora: joystick, auto-fire, waves, upgrades|[▶️](https://monsilaro.github.io/games-lab/arena/)|
 
 *(New prototypes appear on the arcade index automatically.)*
 
