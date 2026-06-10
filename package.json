@@ -1,0 +1,10 @@
+{
+  "name": "games-lab",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "dev": "echo 'Run a single game: pnpm --filter <game> dev (e.g. pnpm --filter flappy dev)'"
+  }
+}

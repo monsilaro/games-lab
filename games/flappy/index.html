@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Flappy" />
+    <meta name="theme-color" content="#4ec0ca" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
+    <title>Flappy</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #4ec0ca;
+        font-family: -apple-system, system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        touch-action: none;
+      }
+      #score {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 16px);
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 56px;
+        font-weight: 800;
+        color: #fff;
+        text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+        pointer-events: none;
+        display: none;
+      }
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px
+          calc(env(safe-area-inset-bottom, 0px) + 16px);
+        text-align: center;
+        color: #fff;
+        text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+        pointer-events: none;
+      }
+      #overlay h1 {
+        font-size: 44px;
+        font-weight: 800;
+      }
+      #overlay p {
+        font-size: 20px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="score">0</div>
+    <div id="overlay">
+      <h1>Flappy</h1>
+      <p>Tap to play</p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="games-lab" />
+    <meta name="theme-color" content="#15161c" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
+    <title>🕹️ games-lab</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        min-height: 100%;
+        background: #15161c;
+        color: #f2f2f7;
+        font-family: -apple-system, system-ui, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        padding: calc(env(safe-area-inset-top, 0px) + 32px)
+          calc(env(safe-area-inset-right, 0px) + 20px)
+          calc(env(safe-area-inset-bottom, 0px) + 32px)
+          calc(env(safe-area-inset-left, 0px) + 20px);
+        max-width: 640px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 32px;
+        margin-bottom: 4px;
+      }
+      .subtitle {
+        color: #8e8e93;
+        margin-bottom: 28px;
+      }
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+      .card {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        background: #23242e;
+        border: 1px solid #32333f;
+        border-radius: 16px;
+        padding: 18px 20px;
+        transition: transform 0.1s ease;
+      }
+      .card:active {
+        transform: scale(0.98);
+        background: #2a2b37;
+      }
+      .card h2 {
+        font-size: 22px;
+        margin-bottom: 4px;
+      }
+      .card p {
+        color: #8e8e93;
+        font-size: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🕹️ games-lab</h1>
+    <p class="subtitle">Tiny web game prototypes. Tap to play.</p>
+    <div class="grid">
+      <a class="card" href="./flappy/">
+        <h2>🐤 Flappy</h2>
+        <p>Tap-to-flap, dodge the pipes</p>
+      </a>
+    </div>
+  </body>
+</html>

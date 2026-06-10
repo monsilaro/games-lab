@@ -1,0 +1,15 @@
+{
+  "name": "Flappy",
+  "short_name": "Flappy",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#4ec0ca",
+  "theme_color": "#4ec0ca",
+  "icons": [
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
