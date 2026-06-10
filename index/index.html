@@ -82,5 +82,17 @@
         <p>Tap-to-flap, dodge the pipes</p>
       </a>
     </div>
+    <script type="module">
+      // GitHub Pages CDN caches HTML for up to 10 min. Stamping the link at
+      // click time busts that cache, so games always open in their latest
+      // deployed version — even if this index page itself is a stale copy.
+      for (const card of document.querySelectorAll('a.card')) {
+        card.addEventListener('click', () => {
+          const url = new URL(card.getAttribute('href'), location.href);
+          url.searchParams.set('t', Date.now().toString());
+          card.href = url.toString();
+        });
+      }
+    </script>
   </body>
 </html>
