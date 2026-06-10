@@ -23,6 +23,7 @@ games-lab/
 - **TypeScript strict**: every `tsconfig.json` extends `../../tsconfig.base.json` and must pass `tsc --noEmit`.
 - **Mobile first** (iPhone Safari): `viewport-fit=cover` meta, `touch-action: none` on the canvas, no scroll/bounce/double-tap zoom, safe-area insets for HTML overlays, `devicePixelRatio` capped at 2, apple-touch-icon + minimal web manifest.
 - **Zero assets** for prototypes: colored geometry, HTML overlays for UI.
+- **No generic HTML ids** (`overlay`, `score`, `banner`, `popup`, `ad`…): ad-blocker cosmetic filters (EasyList via Brave Shields, uBlock, AdGuard) hide them, silently nuking the game UI. Prefix with the game name: `flappy-game-overlay`, `flappy-hud-score`.
 
 ## Adding a new game
 
