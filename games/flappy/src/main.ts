@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+declare const __BUILD_INFO__: string; // injected by vite.config.ts `define`
+
 // --- TUNING ----------------------------------------------------------------
 const WORLD_HEIGHT = 10; // world units visible vertically
 const GRAVITY = -28; // units/s²
@@ -285,6 +287,8 @@ showOverlay(
     ? ['Flappy', `Best: ${highScore}`, 'Tap to play']
     : ['Flappy', 'Tap to play'],
 );
+
+(document.getElementById('build') as HTMLDivElement).textContent = __BUILD_INFO__;
 
 resize();
 requestAnimationFrame(frame);
