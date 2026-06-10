@@ -39,7 +39,7 @@
         display: block;
         touch-action: none;
       }
-      #score {
+      #flappy-hud-score {
         position: fixed;
         top: calc(env(safe-area-inset-top, 0px) + 16px);
         left: 0;
@@ -52,7 +52,7 @@
         pointer-events: none;
         display: none;
       }
-      #overlay {
+      #flappy-game-overlay {
         position: fixed;
         inset: 0;
         display: flex;
@@ -67,15 +67,15 @@
         text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
         pointer-events: none;
       }
-      #overlay h1 {
+      #flappy-game-overlay h1 {
         font-size: 44px;
         font-weight: 800;
       }
-      #overlay p {
+      #flappy-game-overlay p {
         font-size: 20px;
         font-weight: 600;
       }
-      #build {
+      #flappy-build-stamp {
         position: fixed;
         right: calc(env(safe-area-inset-right, 0px) + 8px);
         top: calc(env(safe-area-inset-top, 0px) + 8px);
@@ -86,9 +86,9 @@
     </style>
   </head>
   <body>
-    <div id="score">0</div>
-    <div id="build"></div>
-    <div id="overlay">
+    <div id="flappy-hud-score">0</div>
+    <div id="flappy-build-stamp"></div>
+    <div id="flappy-game-overlay">
       <h1>Flappy</h1>
       <p>Tap to play</p>
     </div>

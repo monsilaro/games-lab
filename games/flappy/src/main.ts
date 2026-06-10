@@ -115,8 +115,8 @@ function clearPipes(): void {
 }
 
 // --- HUD ----------------------------------------------------------------------
-const scoreEl = document.getElementById('score') as HTMLDivElement;
-const overlayEl = document.getElementById('overlay') as HTMLDivElement;
+const scoreEl = document.getElementById('flappy-hud-score') as HTMLDivElement;
+const overlayEl = document.getElementById('flappy-game-overlay') as HTMLDivElement;
 
 function showOverlay(lines: string[]): void {
   const [title, ...rest] = lines;
@@ -289,7 +289,7 @@ showOverlay([
   `v ${__BUILD_INFO__}`,
 ]);
 
-(document.getElementById('build') as HTMLDivElement).textContent = __BUILD_INFO__;
+(document.getElementById('flappy-build-stamp') as HTMLDivElement).textContent = __BUILD_INFO__;
 
 resize();
 requestAnimationFrame(frame);
