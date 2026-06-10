@@ -116,9 +116,30 @@ function clearPipes(): void {
 const scoreEl = document.getElementById('score') as HTMLDivElement;
 const overlayEl = document.getElementById('overlay') as HTMLDivElement;
 
-function showOverlay(title: string, subtitle: string): void {
-  overlayEl.innerHTML = `<h1>${title}</h1><p>${subtitle}</p>`;
+function showOverlay(lines: string[]): void {
+  const [title, ...rest] = lines;
+  overlayEl.innerHTML =
+    `<h1>${title ?? ''}</h1>` + rest.map((line) => `<p>${line}</p>`).join('');
   overlayEl.style.display = 'flex';
+}
+
+// --- High score (localStorage can throw in private browsing — fail soft) -------
+const HIGHSCORE_KEY = 'flappy.highscore';
+
+function loadHighScore(): number {
+  try {
+    return Number(localStorage.getItem(HIGHSCORE_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveHighScore(value: number): void {
+  try {
+    localStorage.setItem(HIGHSCORE_KEY, String(value));
+  } catch {
+    // ignore — score just won't persist
+  }
 }
 
 // --- Game state -----------------------------------------------------------------
@@ -126,6 +147,7 @@ let state: GameState = 'ready';
 let birdY = 0;
 let birdVelocity = 0;
 let score = 0;
+let highScore = loadHighScore();
 
 function resetGame(): void {
   birdY = 0;
@@ -149,7 +171,16 @@ function startGame(): void {
 function gameOver(): void {
   state = 'gameover';
   scoreEl.style.display = 'none';
-  showOverlay(`Score: ${score}`, 'Tap to play again');
+  const isNewBest = score > highScore;
+  if (isNewBest) {
+    highScore = score;
+    saveHighScore(highScore);
+  }
+  showOverlay([
+    `Score: ${score}`,
+    isNewBest ? '🏆 New best!' : `Best: ${highScore}`,
+    'Tap to play again',
+  ]);
 }
 
 window.addEventListener('pointerdown', (e) => {
@@ -248,6 +279,12 @@ function frame(now: number): void {
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
+
+showOverlay(
+  highScore > 0
+    ? ['Flappy', `Best: ${highScore}`, 'Tap to play']
+    : ['Flappy', 'Tap to play'],
+);
 
 resize();
 requestAnimationFrame(frame);
