@@ -87,9 +87,32 @@
         color: rgba(255, 255, 255, 0.55);
         pointer-events: none;
       }
+      #flappy-hud-score.pop {
+        animation: scorePop 0.25s ease-out;
+      }
+      @keyframes scorePop {
+        0% {
+          transform: scale(1);
+        }
+        40% {
+          transform: scale(1.35);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      #flappy-death-flash {
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 20;
+      }
     </style>
   </head>
   <body>
+    <div id="flappy-death-flash"></div>
     <div id="flappy-hud-score">0</div>
     <div id="flappy-build-stamp"></div>
     <div id="flappy-game-overlay">
