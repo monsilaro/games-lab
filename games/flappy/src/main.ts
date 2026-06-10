@@ -282,11 +282,12 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 
-showOverlay(
-  highScore > 0
-    ? ['Flappy', `Best: ${highScore}`, 'Tap to play']
-    : ['Flappy', 'Tap to play'],
-);
+showOverlay([
+  'Flappy',
+  ...(highScore > 0 ? [`Best: ${highScore}`] : []),
+  'Tap to play',
+  `v ${__BUILD_INFO__}`,
+]);
 
 (document.getElementById('build') as HTMLDivElement).textContent = __BUILD_INFO__;
 
