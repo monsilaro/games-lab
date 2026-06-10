@@ -38,9 +38,11 @@
         inset: 0;
         display: block;
         touch-action: none;
+        z-index: 0;
       }
       #flappy-hud-score {
         position: fixed;
+        z-index: 10;
         top: calc(env(safe-area-inset-top, 0px) + 16px);
         left: 0;
         right: 0;
@@ -54,6 +56,7 @@
       }
       #flappy-game-overlay {
         position: fixed;
+        z-index: 10;
         inset: 0;
         display: flex;
         flex-direction: column;
@@ -77,6 +80,7 @@
       }
       #flappy-build-stamp {
         position: fixed;
+        z-index: 10;
         right: calc(env(safe-area-inset-right, 0px) + 8px);
         top: calc(env(safe-area-inset-top, 0px) + 8px);
         font-size: 10px;
