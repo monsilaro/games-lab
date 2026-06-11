@@ -95,6 +95,11 @@ export function removeBody(body: Matter.Body): void {
   if (d !== -1) dynamicBodies.splice(d, 1);
   const p = pairs.findIndex((pair) => pair.body === body);
   if (p !== -1) pairs.splice(p, 1);
+  // Matter only wakes sleeping bodies on collision — removing a body from
+  // under a sleeping stack would leave the stack frozen in mid-air (e.g. a
+  // shattered column whose floor never falls). Wake everyone; bodies already
+  // at rest go straight back to sleep.
+  for (const b of dynamicBodies) if (b.isSleeping) Sleeping.set(b, false);
 }
 
 /** Copy body transforms onto their meshes — call once per rendered frame. */

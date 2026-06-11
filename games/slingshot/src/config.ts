@@ -42,8 +42,10 @@ export const BALL_RADIUS = 0.32;
 export const BALL_DENSITY = 0.004; // ~4× block density: satisfying knockdowns
 export const BALL_RESTITUTION = 0.4;
 export const BALL_FRICTION = 0.5;
-export const PREVIEW_DOTS = 22; // dashed trajectory arc
-export const PREVIEW_STEP = 4; // physics ticks between consecutive dots
+export const PREVIEW_DOTS = 28; // dashed trajectory arc
+export const PREVIEW_STEP = 7; // physics ticks between consecutive dots
+// 28 × 7 = 196 ticks ≈ 3.3 s of flight: a full-power shot is previewed all the
+// way down to the ground, never truncated mid-air.
 
 // blocks
 export const COL_W = 0.35; // vertical column size
