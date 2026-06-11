@@ -198,7 +198,7 @@ window.addEventListener('pointerdown', (e) => {
 hud.setHudVisible(false);
 hud.showOverlay('Slingshot', [
   'Topple the towers under the aurora',
-  'Drag back near the sling to aim, release to fire',
+  'Drag back anywhere to aim, release to fire',
   'Tap to start',
   `v ${__BUILD_INFO__}`,
 ]);

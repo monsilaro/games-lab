@@ -14,7 +14,9 @@ export class Slingshot {
 
   private dragging = false;
   private pointerId = -1;
-  private dragX = 0; // drag vector d = ANCHOR − pointer, clamped
+  private startX = 0; // where the drag began, world units
+  private startY = 0;
+  private dragX = 0; // drag vector d = start − pointer, clamped
   private dragY = 0;
   private readonly elasticPos: THREE.BufferAttribute;
   private readonly dots: THREE.Mesh[] = [];
@@ -99,16 +101,20 @@ export class Slingshot {
 
   private onDown(e: PointerEvent): void {
     if (!this.enabled || this.dragging) return;
-    if (this.toWorldX(e) > C.GRAB_ZONE_X) return; // generous grab zone, no precise pouch tap
+    // Aiming is relative to where the finger lands, so the drag can start
+    // anywhere on screen — the anchor sits near the bottom edge, and absolute
+    // aiming would leave no room to pull down for steep, powerful shots.
     this.dragging = true;
     this.pointerId = e.pointerId;
+    this.startX = this.toWorldX(e);
+    this.startY = this.toWorldY(e);
     this.onMove(e);
   }
 
   private onMove(e: PointerEvent): void {
     if (!this.dragging || e.pointerId !== this.pointerId) return;
-    let dx = C.ANCHOR.x - this.toWorldX(e);
-    let dy = C.ANCHOR.y - this.toWorldY(e);
+    let dx = this.startX - this.toWorldX(e);
+    let dy = this.startY - this.toWorldY(e);
     const len = Math.hypot(dx, dy);
     if (len > C.MAX_DRAG) {
       dx *= C.MAX_DRAG / len;
@@ -116,8 +122,10 @@ export class Slingshot {
     }
     this.dragX = dx;
     this.dragY = dy;
-    this.pouch.x = C.ANCHOR.x - dx;
-    this.pouch.y = C.ANCHOR.y - dy;
+    // The pouch is the launch point (fire + preview both read it): keep it on
+    // screen and above the ground so the ball never spawns inside the floor.
+    this.pouch.x = Math.max(C.ANCHOR.x - dx, -0.6);
+    this.pouch.y = Math.max(C.ANCHOR.y - dy, C.GROUND_Y + C.BALL_RADIUS);
     this.writeElastic();
     this.updatePreview();
   }

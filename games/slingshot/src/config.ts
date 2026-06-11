@@ -38,7 +38,6 @@ export const LAUNCH_K = 4.5; // launch speed (units/s) per unit of drag
 export const V_MAX = 22; // speed cap → 45° range ≈ V_MAX²/GRAVITY ≈ 24 units
 export const MAX_DRAG = V_MAX / LAUNCH_K;
 export const MIN_DRAG = 0.3; // below this, release cancels instead of firing
-export const GRAB_ZONE_X = MIN_VIEW_WIDTH / 3; // tap left of this to start aiming
 export const BALL_RADIUS = 0.32;
 export const BALL_DENSITY = 0.004; // ~4× block density: satisfying knockdowns
 export const BALL_RESTITUTION = 0.4;
