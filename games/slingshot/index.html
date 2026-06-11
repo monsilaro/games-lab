@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Slingshot" />
+    <meta name="theme-color" content="#0a1128" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
+    <title>Slingshot</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #0a1128;
+        color: #f4f4f6;
+        font-family: -apple-system, system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        touch-action: none;
+        z-index: 0;
+      }
+
+      /* --- HUD ------------------------------------------------------------ */
+      #slingshot-hud {
+        position: fixed;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        left: calc(env(safe-area-inset-left, 0px) + 14px);
+        right: calc(env(safe-area-inset-right, 0px) + 14px);
+        display: none;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        color: rgba(244, 244, 246, 0.85);
+        pointer-events: none;
+      }
+      #slingshot-shots {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+      }
+      .slingshot-shot-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #ff9f1c;
+        box-shadow: 0 0 6px rgba(255, 159, 28, 0.7);
+      }
+      .slingshot-shot-dot.spent {
+        background: rgba(202, 240, 248, 0.18);
+        box-shadow: none;
+      }
+
+      /* --- Score pop ---------------------------------------------------------- */
+      #slingshot-score-pop {
+        position: fixed;
+        z-index: 10;
+        top: 22%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 30px;
+        font-weight: 800;
+        color: #2ec4b6;
+        text-shadow: 0 0 14px rgba(46, 196, 182, 0.6);
+        opacity: 0;
+        pointer-events: none;
+      }
+      #slingshot-score-pop.show {
+        animation: slingshotPopIn 1.1s ease-out;
+      }
+      @keyframes slingshotPopIn {
+        0% { opacity: 0; transform: translateY(12px) scale(0.85); }
+        15% { opacity: 1; transform: translateY(0) scale(1.08); }
+        30% { transform: scale(1); }
+        70% { opacity: 1; }
+        100% { opacity: 0; transform: translateY(-14px); }
+      }
+
+      /* --- Next-shot button --------------------------------------------------- */
+      #slingshot-next-btn {
+        position: fixed;
+        z-index: 12;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+        display: none;
+        padding: 9px 18px;
+        border: 2px solid rgba(202, 240, 248, 0.6);
+        border-radius: 14px;
+        background: rgba(28, 37, 65, 0.85);
+        color: #caf0f8;
+        font: inherit;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      #slingshot-next-btn:active {
+        transform: translateX(-50%) scale(0.95);
+      }
+
+      /* --- Overlay -------------------------------------------------------------- */
+      #slingshot-game-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px
+          calc(env(safe-area-inset-bottom, 0px) + 16px);
+        text-align: center;
+        background: rgba(10, 17, 40, 0.55);
+        pointer-events: none;
+      }
+      #slingshot-game-overlay h1 {
+        font-size: 42px;
+        font-weight: 800;
+        text-shadow: 0 0 24px rgba(202, 240, 248, 0.35);
+      }
+      #slingshot-game-overlay p {
+        font-size: 18px;
+        font-weight: 600;
+        color: rgba(244, 244, 246, 0.85);
+      }
+
+      #slingshot-build-stamp {
+        position: fixed;
+        z-index: 10;
+        right: calc(env(safe-area-inset-right, 0px) + 8px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+        font-size: 10px;
+        color: rgba(244, 244, 246, 0.4);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="slingshot-hud">
+      <span id="slingshot-level-label">Level 1</span>
+      <div id="slingshot-shots"></div>
+      <span id="slingshot-score-label">0</span>
+    </div>
+    <div id="slingshot-score-pop"></div>
+    <button type="button" id="slingshot-next-btn">Next shot →</button>
+    <div id="slingshot-build-stamp"></div>
+    <div id="slingshot-game-overlay"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

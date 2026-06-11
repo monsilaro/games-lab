@@ -52,6 +52,34 @@ importers:
         specifier: ^6.3.5
         version: 6.4.3(@types/node@25.9.2)
 
+  games/slingshot:
+    dependencies:
+      '@games-lab/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      matter-js:
+        specifier: ^0.20.0
+        version: 0.20.0
+      three:
+        specifier: ^0.177.0
+        version: 0.177.0
+    devDependencies:
+      '@types/matter-js':
+        specifier: ^0.20.2
+        version: 0.20.2
+      '@types/node':
+        specifier: ^25.9.2
+        version: 25.9.2
+      '@types/three':
+        specifier: ^0.177.0
+        version: 0.177.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vite:
+        specifier: ^6.3.5
+        version: 6.4.3(@types/node@25.9.2)
+
   index:
     devDependencies:
       typescript:
@@ -379,6 +407,9 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
+  '@types/matter-js@0.20.2':
+    resolution: {integrity: sha512-3PPKy3QxvZ89h9+wdBV2488I1JLVs7DEpIkPvgO8JC1mUdiVSO37ZIvVctOTD7hIq8OAL2gJ3ugGSuUip6DhCw==}
+
   '@types/node@25.9.2':
     resolution: {integrity: sha512-G05zqtJhcDLb8uslf5EjCxXg9G1KQxiV8OS0R26IC//Eoyitzqe8z37I7cqvnZlrlSfgocQRfSn/AHBZJJFyGw==}
 
@@ -415,6 +446,9 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  matter-js@0.20.0:
+    resolution: {integrity: sha512-iC9fYR7zVT3HppNnsFsp9XOoQdQN2tUyfaKg4CHLH8bN+j6GT4Gw7IH2rP0tflAebrHFw730RR3DkVSZRX8hwA==}
 
   meshoptimizer@0.18.1:
     resolution: {integrity: sha512-ZhoIoL7TNV4s5B6+rx5mC//fw8/POGyNxS/DZyCJeiZ12ScLfVwRE/GfsxwiTkMYYD5DmK2/JXnEVXqL4rF+Sw==}
@@ -660,6 +694,8 @@ snapshots:
 
   '@types/estree@1.0.9': {}
 
+  '@types/matter-js@0.20.2': {}
+
   '@types/node@25.9.2':
     dependencies:
       undici-types: 7.24.6
@@ -717,6 +753,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  matter-js@0.20.0: {}
 
   meshoptimizer@0.18.1: {}
 

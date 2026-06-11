@@ -22,6 +22,7 @@ From prompt to playable build on device in about a minute.
 |------|----------------------------|--------------------------------------------------|
 |Flappy|Tap-to-flap, dodge the pipes|[▶️](https://monsilaro.github.io/games-lab/flappy/)|
 |Arena |Survivors-like under the aurora: joystick, auto-fire, waves, upgrades|[▶️](https://monsilaro.github.io/games-lab/arena/)|
+|Slingshot|Angry-Birds-like: drag to aim, topple procedural towers, save your shots|[▶️](https://monsilaro.github.io/games-lab/slingshot/)|
 
 *(New prototypes appear on the arcade index automatically.)*
 

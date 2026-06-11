@@ -1,8 +1,10 @@
 // Code gets promoted here ONLY once it is duplicated in 2+ games.
-// Currently shared by flappy + arena: renderer/ortho-camera bootstrap and the
-// delta-time game loop.
+// Currently shared: renderer/ortho-camera bootstrap and the delta-time game
+// loop (flappy + arena + slingshot), and the aurora palette (arena + slingshot).
 
 import * as THREE from 'three';
+
+export * from './theme';
 
 export interface OrthoApp {
   renderer: THREE.WebGLRenderer;

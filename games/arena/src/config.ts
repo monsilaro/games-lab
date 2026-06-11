@@ -1,17 +1,19 @@
 // All tuning lives here. Tweak, push, replay.
 
-// "Aurora borealis" palette — the orange warmth belongs to the player (and
-// their projectiles) ONLY; everything else stays cold.
+import { AURORA } from '@games-lab/shared';
+
+// "Aurora borealis" palette (shared theme) — the orange warmth belongs to the
+// player (and their projectiles) ONLY; everything else stays cold.
 export const PALETTE = {
-  night: 0x0a1128, // map background
-  wall: 0x1c2541, // bounds walls
-  player: 0xff9f1c, // ember orange — the ONLY warm color
-  projectile: 0xffd166, // warm yellow-white
-  chaser: 0x2ec4b6, // aurora green
-  runner: 0x9d4edd, // aurora violet
-  gem: 0xcaf0f8, // ice cyan
-  flash: 0xffffff, // 1-frame hit flash
-  snow: 0xffffff, // static ground dots
+  night: AURORA.night, // map background
+  wall: AURORA.deepBlue, // bounds walls
+  player: AURORA.ember, // ember orange — the ONLY warm color
+  projectile: AURORA.emberLight, // warm yellow-white
+  chaser: AURORA.auroraGreen, // aurora green
+  runner: AURORA.violet, // aurora violet
+  gem: AURORA.iceCyan, // ice cyan
+  flash: AURORA.white, // 1-frame hit flash
+  snow: AURORA.white, // static ground dots
 } as const;
 
 // view / camera
