@@ -16,10 +16,11 @@ const lightMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.blockLight });
 interface Block {
   mesh: THREE.Mesh;
   body: Matter.Body | null;
+  color: number;
 }
 
 const pool: Block[] = [];
-const colorByBodyId = new Map<number, number>();
+const byBodyId = new Map<number, Block>();
 
 export function init(scene: THREE.Scene): void {
   for (let i = 0; i < C.BLOCK_POOL; i++) {
@@ -27,7 +28,7 @@ export function init(scene: THREE.Scene): void {
     mesh.visible = false;
     mesh.position.z = 0.1;
     scene.add(mesh);
-    pool.push({ mesh, body: null });
+    pool.push({ mesh, body: null, color: C.PALETTE.blockDark });
   }
 
   // static ground: solid floor for matter + the off-white snow band visual
@@ -61,7 +62,8 @@ export function spawnFromDescs(descs: BlockDesc[]): void {
     slot.mesh.scale.set(desc.w, desc.h, 1);
     slot.mesh.rotation.z = 0;
     slot.mesh.visible = true;
-    colorByBodyId.set(body.id, desc.tone === 'dark' ? C.PALETTE.blockDark : C.PALETTE.blockLight);
+    slot.color = desc.tone === 'dark' ? C.PALETTE.blockDark : C.PALETTE.blockLight;
+    byBodyId.set(body.id, slot);
     physics.addBody(body, slot.mesh);
   }
 }
@@ -72,10 +74,20 @@ export function reset(): void {
     block.body = null;
     block.mesh.visible = false;
   }
-  colorByBodyId.clear();
+  byBodyId.clear();
+}
+
+/** Shatter a block: remove its body and hide its mesh (no-op for non-blocks). */
+export function breakBlock(body: Matter.Body): void {
+  const block = byBodyId.get(body.id);
+  if (!block || !block.body) return;
+  physics.removeBody(block.body);
+  byBodyId.delete(body.id);
+  block.body = null;
+  block.mesh.visible = false;
 }
 
 /** Burst color for a struck block (falls back to snow for non-blocks). */
 export function colorOf(body: Matter.Body): number {
-  return colorByBodyId.get(body.id) ?? C.PALETTE.snow;
+  return byBodyId.get(body.id)?.color ?? C.PALETTE.snow;
 }

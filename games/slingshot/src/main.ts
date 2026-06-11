@@ -152,12 +152,21 @@ function maybeKill(target: Target, other: Matter.Body, rel: number): void {
   if (rel > threshold) killTarget(target);
 }
 
+function shatterBlock(body: Matter.Body): void {
+  effects.burst(body.position.x, body.position.y, blocks.colorOf(body), C.BLOCK_BREAK_BURST);
+  blocks.breakBlock(body);
+}
+
 physics.setImpactHandler((a, b, rel, x, y) => {
   if (state !== 'aiming' && state !== 'flying') return;
   const targetA = targets.fromBody(a);
   const targetB = targets.fromBody(b);
   if (targetA) maybeKill(targetA, b, rel);
   if (targetB) maybeKill(targetB, a, rel);
+  if (rel > C.BLOCK_BREAK_IMPACT) {
+    if (a.label === 'block') shatterBlock(a);
+    if (b.label === 'block') shatterBlock(b);
+  }
   if (rel > C.SHAKE_IMPACT) {
     effects.shake();
     effects.burst(x, y, blocks.colorOf(a.label === 'block' ? a : b), C.IMPACT_BURST);

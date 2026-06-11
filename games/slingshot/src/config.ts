@@ -51,6 +51,8 @@ export const COL_H = 1.2;
 export const PLANK_H = 0.3; // horizontal plank thickness
 export const PLANK_OVERHANG = 0.8; // plank width = column gap + this
 export const BLOCK_FRICTION = 0.6;
+export const BLOCK_BREAK_IMPACT = 7.0; // units/s — blocks shatter above this (lower = more fragile)
+export const BLOCK_BREAK_BURST = 10; // particles per shattered block
 
 // targets
 export const TARGET_RADIUS = 0.34;
