@@ -15,7 +15,13 @@ export const PALETTE = {
   targetCore: AURORA.night, // inner disc that makes targets read as rings
   sling: AURORA.violet,
   preview: AURORA.iceCyan,
+  previewHot: AURORA.ember, // preview dots lerp toward this at full power
   star: AURORA.white,
+  ice: AURORA.iceCyan, // fragile block (drawn translucent)
+  stone: 0x6c7a91, // tough block — cool grey, distinct from the slate woods
+  tnt: 0x7b2cbf, // explosive block — deep violet (stays cold per the theme)
+  auroraA: AURORA.auroraGreen, // sky ribbon gradient: green …
+  auroraB: AURORA.violet, // … to violet
 } as const;
 
 // view / world — 1 unit ≈ 1 m, y up, ground top surface at y = 0.
@@ -117,3 +123,49 @@ export const GAP_MIN = 1.1; // column gap — keep > 2·TARGET_RADIUS + margin
 export const GAP_MAX = 1.6;
 export const GAP_SHRINK = 0.9; // gap multiplier per floor going up
 export const FLOOR_JITTER = 0.05; // ≪ COL_W so towers stay stable
+
+// --- living aurora sky (effects.ts) ---------------------------------------------
+export const AURORA_BANDS = 3; // number of drifting ribbons
+export const AURORA_BASE_Y = 7; // world height the lowest ribbon sits at
+export const AURORA_DRIFT = 0.35; // horizontal drift speed (units/s of phase)
+export const AURORA_WAVE_AMP = 1.1; // vertical undulation amplitude (world units)
+export const AURORA_ALPHA = 0.26; // peak opacity of a ribbon
+export const STAR_TWINKLE_HZ = 0.5; // base twinkle rate (each star phased)
+
+// --- slingshot / aim polish (slingshot.ts) --------------------------------------
+export const BAND_WIDTH = 0.09; // thickness of each elastic band quad (world units)
+
+// --- block materials (config-driven; blocks.ts + levelgen.ts) --------------------
+export type BlockMaterial = 'wood' | 'ice' | 'stone' | 'tnt';
+export interface MaterialDef {
+  color: number; // mesh + burst tint (wood overrides per dark/light tone)
+  breakImpact: number; // relative speed (units/s) above which it shatters
+  density: number; // matter density — wood matches the prior default
+  restitution: number;
+  opacity: number; // < 1 → translucent (ice)
+  burst: number; // particles spawned when it shatters
+}
+export const MATERIALS: Record<BlockMaterial, MaterialDef> = {
+  wood: { color: PALETTE.blockLight, breakImpact: BLOCK_BREAK_IMPACT, density: 0.001, restitution: 0, opacity: 1, burst: BLOCK_BREAK_BURST },
+  ice: { color: PALETTE.ice, breakImpact: 4.0, density: 0.0007, restitution: 0.1, opacity: 0.5, burst: 16 },
+  stone: { color: PALETTE.stone, breakImpact: 18.0, density: 0.0026, restitution: 0, opacity: 1, burst: 8 },
+  tnt: { color: PALETTE.tnt, breakImpact: 5.0, density: 0.0013, restitution: 0, opacity: 1, burst: 18 },
+};
+
+// TNT explosion (main.ts orchestrates, physics.ts applies the impulse)
+export const TNT_RADIUS = 3.2; // world units of blast reach
+export const TNT_SPEED = 16; // outward launch speed (units/s) at the blast center
+export const TNT_BURST = 26; // white flash particles
+
+// --- combo & skill-shot scoring (main.ts) ---------------------------------------
+// combo multiplier = number of targets killed so far this shot (1×, 2×, 3× …)
+export const COMBO_NAMES = ['', '', 'DOUBLE KILL', 'TRIPLE KILL', 'MULTI KILL'] as const;
+export const SKILL_NOBOUNCE_BONUS = 75; // target killed before the ball first bounces
+export const SKILL_LONGSHOT_BONUS = 100; // kill far downrange from the launch point
+export const LONGSHOT_DIST = 12; // world units from launch X to the kill
+export const STAR3_SPARE = 2; // spare shots on clear → 3 stars
+export const STAR2_SPARE = 1; // → 2 stars (else 1)
+
+// --- audio (audio.ts) -----------------------------------------------------------
+export const SFX_MASTER_GAIN = 0.32; // 0..1 master volume for synth SFX
+export const AMBIENT_ENABLED = false; // subtle drone pad — off by default

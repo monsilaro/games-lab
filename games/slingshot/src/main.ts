@@ -7,6 +7,7 @@ import * as blocks from './blocks';
 import * as targets from './targets';
 import type { Target } from './targets';
 import * as effects from './effects';
+import * as audio from './audio';
 import * as hud from './hud';
 import { generateLevel } from './levelgen';
 import { Slingshot } from './slingshot';
@@ -66,6 +67,9 @@ let shotsTotal = 0;
 let elapsed = 0;
 let stateAt = 0;
 let stillTime = 0;
+let shotKills = 0; // targets eliminated by the current shot → combo multiplier
+let ballBounces = 0; // ground contacts this shot → no-bounce skill bonus
+let launchX = 0; // launch X, for the long-shot skill bonus
 
 function setState(next: GameState): void {
   state = next;
@@ -127,6 +131,11 @@ function fire(x: number, y: number, vx: number, vy: number): void {
   });
   Body.setVelocity(ballBody, { x: physics.toTick(vx), y: physics.toTick(vy) });
   physics.addBody(ballBody, ballMesh);
+  shotKills = 0;
+  ballBounces = 0;
+  launchX = x;
+  audio.launch();
+  audio.vibrate(15);
   shotsLeft -= 1;
   hud.setShots(shotsLeft, shotsTotal);
   sling.enabled = false;
@@ -142,9 +151,33 @@ function killTarget(target: Target): void {
   const { x, y } = target.body.position;
   targets.kill(target);
   effects.burst(x, y, C.PALETTE.target, C.KILL_BURST);
-  score += C.POINTS_PER_TARGET;
+  audio.vibrate(20);
+
+  // combo: each kill this shot is worth more than the last
+  shotKills += 1;
+  audio.targetChime(shotKills);
+  const pts = C.POINTS_PER_TARGET * shotKills;
+  score += pts;
+
+  // skill-shot bonuses
+  let bonus = 0;
+  const tags: string[] = [];
+  if (ballBounces === 0) {
+    bonus += C.SKILL_NOBOUNCE_BONUS;
+    tags.push('No bounce');
+  }
+  if (Math.abs(x - launchX) >= C.LONGSHOT_DIST) {
+    bonus += C.SKILL_LONGSHOT_BONUS;
+    tags.push('Long shot');
+  }
+  score += bonus;
   hud.setScore(score);
-  hud.scorePop(`+${C.POINTS_PER_TARGET}`);
+
+  // callout: combo name (×2+) or plain points, then any skill tags
+  const combo = C.COMBO_NAMES[Math.min(shotKills, C.COMBO_NAMES.length - 1)] ?? '';
+  let text = combo ? `${combo}  +${pts}` : shotKills >= 2 ? `+${pts}  ×${shotKills}` : `+${pts}`;
+  if (tags.length) text += `  ${tags.join(' ')} +${bonus}`;
+  hud.scorePop(text);
 }
 
 function maybeKill(target: Target, other: Matter.Body, rel: number): void {
@@ -153,23 +186,45 @@ function maybeKill(target: Target, other: Matter.Body, rel: number): void {
 }
 
 function shatterBlock(body: Matter.Body): void {
-  effects.burst(body.position.x, body.position.y, blocks.colorOf(body), C.BLOCK_BREAK_BURST);
+  const mat = blocks.materialOf(body);
+  if (!mat) return; // already gone (e.g. caught in a chained explosion)
+  const { x, y } = body.position;
+  effects.burst(x, y, blocks.colorOf(body), C.MATERIALS[mat].burst);
+  if (mat !== 'tnt') audio.shatter(mat);
   blocks.breakBlock(body);
+  if (mat === 'tnt') explodeAt(x, y);
+}
+
+/** TNT blast: white flash + boom, knock everything back, blow non-stone blocks. */
+function explodeAt(x: number, y: number): void {
+  effects.shake();
+  effects.burst(x, y, C.PALETTE.star, C.TNT_BURST);
+  audio.boom();
+  audio.vibrate([0, 40, 30, 60]);
+  for (const b of physics.explode(x, y, C.TNT_RADIUS, C.TNT_SPEED)) {
+    const m = blocks.materialOf(b);
+    if (m && m !== 'stone') shatterBlock(b); // stone only gets shoved; rest detonate/break
+    const t = targets.fromBody(b);
+    if (t) killTarget(t);
+  }
 }
 
 physics.setImpactHandler((a, b, rel, x, y) => {
   if (state !== 'aiming' && state !== 'flying') return;
+  if ((a.label === 'ball' && b.label === 'ground') || (b.label === 'ball' && a.label === 'ground')) {
+    ballBounces += 1;
+  }
   const targetA = targets.fromBody(a);
   const targetB = targets.fromBody(b);
   if (targetA) maybeKill(targetA, b, rel);
   if (targetB) maybeKill(targetB, a, rel);
-  if (rel > C.BLOCK_BREAK_IMPACT) {
-    if (a.label === 'block') shatterBlock(a);
-    if (b.label === 'block') shatterBlock(b);
-  }
+  if (a.label === 'block' && rel > blocks.breakImpactOf(a)) shatterBlock(a);
+  if (b.label === 'block' && rel > blocks.breakImpactOf(b)) shatterBlock(b);
   if (rel > C.SHAKE_IMPACT) {
     effects.shake();
     effects.burst(x, y, blocks.colorOf(a.label === 'block' ? a : b), C.IMPACT_BURST);
+    audio.thud(rel);
+    audio.vibrate(30);
   }
 });
 
@@ -181,6 +236,9 @@ function advanceShot(): void {
     const bonus = shotsLeft * C.BONUS_PER_SHOT;
     score += bonus;
     hud.setScore(score);
+    const stars = shotsLeft >= C.STAR3_SPARE ? 3 : shotsLeft >= C.STAR2_SPARE ? 2 : 1;
+    hud.showStars(stars);
+    audio.levelClear(stars);
     if (bonus > 0) hud.scorePop(`Level clear! +${bonus}`);
     level += 1;
     startLevel(level);
@@ -193,11 +251,15 @@ function advanceShot(): void {
   }
 }
 
-hud.initNextButton(advanceShot);
+hud.initNextButton(() => {
+  audio.uiTap();
+  advanceShot();
+});
 
 // --- Input: tap to (re)start ------------------------------------------------------
 window.addEventListener('pointerdown', (e) => {
   e.preventDefault();
+  audio.unlock(); // every gesture re-arms audio (iOS needs it inside a gesture)
   if ((state === 'ready' || state === 'gameover') && elapsed - stateAt > 0.6) {
     startGame();
   }

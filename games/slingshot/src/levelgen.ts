@@ -12,7 +12,17 @@ export interface BlockDesc {
   y: number;
   w: number;
   h: number;
-  tone: BlockTone;
+  tone: BlockTone; // only meaningful for wood (dark/light contrast)
+  material: C.BlockMaterial;
+}
+
+// Material mix widens with the level: ice from L2, stone from L4, TNT from L6.
+function pickMaterial(level: number): C.BlockMaterial {
+  const r = Math.random();
+  if (level >= 6 && r < 0.08) return 'tnt';
+  if (level >= 4 && r < 0.24) return 'stone';
+  if (level >= 2 && r < 0.42) return 'ice';
+  return 'wood';
 }
 
 export interface TargetDesc {
@@ -59,14 +69,16 @@ export function generateLevel(level: number): LevelLayout {
         dark = !dark;
         return dark ? 'dark' : 'light';
       };
-      blocks.push({ x: cx + jitter - gap / 2, y: colY, w: C.COL_W, h: C.COL_H, tone: tone() });
-      blocks.push({ x: cx + jitter + gap / 2, y: colY, w: C.COL_W, h: C.COL_H, tone: tone() });
+      const mat = (): C.BlockMaterial => pickMaterial(level);
+      blocks.push({ x: cx + jitter - gap / 2, y: colY, w: C.COL_W, h: C.COL_H, tone: tone(), material: mat() });
+      blocks.push({ x: cx + jitter + gap / 2, y: colY, w: C.COL_W, h: C.COL_H, tone: tone(), material: mat() });
       blocks.push({
         x: cx + jitter,
         y: baseY + C.COL_H + C.PLANK_H / 2,
         w: gap + C.PLANK_OVERHANG,
         h: C.PLANK_H,
         tone: tone(),
+        material: mat(),
       });
       // inside this floor: sheltered by the columns and the plank above
       slots.push({ x: cx + jitter, y: baseY + C.TARGET_RADIUS, protection: 3 });

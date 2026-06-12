@@ -6,7 +6,7 @@ import type * as THREE from 'three';
 import Matter from 'matter-js';
 import * as C from './config';
 
-const { Engine, Composite, Events, Sleeping } = Matter;
+const { Engine, Composite, Events, Sleeping, Body } = Matter;
 
 export const engine = Engine.create({ enableSleeping: true });
 // Matter applies gravity per tick as gravity.y · gravity.scale · dt_ms²; with a
@@ -130,4 +130,30 @@ export function sleepingCount(): number {
 /** Remove every dynamic body (between levels / on restart). */
 export function resetWorld(): void {
   while (dynamicBodies.length > 0) removeBody(dynamicBodies[dynamicBodies.length - 1]!);
+}
+
+/**
+ * Radial blast at (x, y): every dynamic body within `radius` is shoved outward
+ * with `speed` (units/s) at the center, falling off linearly to 0 at the edge.
+ * Returns the bodies that were hit (excluding the blast origin) so the caller
+ * can decide which to break. Velocity replaces (not adds to) the current one —
+ * a clean kick reads better than accumulating momentum on a chained explosion.
+ */
+export function explode(x: number, y: number, radius: number, speed: number): Matter.Body[] {
+  const hit: Matter.Body[] = [];
+  for (const body of dynamicBodies) {
+    const dx = body.position.x - x;
+    const dy = body.position.y - y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > radius) continue;
+    if (body.isSleeping) Sleeping.set(body, false);
+    const falloff = 1 - dist / radius;
+    const v = speed * falloff;
+    // a body sitting exactly on the origin gets pushed straight up
+    const nx = dist > 1e-4 ? dx / dist : 0;
+    const ny = dist > 1e-4 ? dy / dist : 1;
+    Body.setVelocity(body, { x: toTick(nx * v), y: toTick(ny * v) });
+    hit.push(body);
+  }
+  return hit;
 }

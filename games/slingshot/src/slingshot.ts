@@ -18,9 +18,17 @@ export class Slingshot {
   private startY = 0;
   private dragX = 0; // drag vector d = start − pointer, clamped
   private dragY = 0;
-  private readonly elasticPos: THREE.BufferAttribute;
+  private readonly bandMat: THREE.MeshBasicMaterial;
+  private readonly bandL: THREE.Mesh;
+  private readonly bandR: THREE.Mesh;
+  private readonly cup: THREE.Mesh;
   private readonly dots: THREE.Mesh[] = [];
   private readonly dotMats: THREE.MeshBasicMaterial[] = [];
+  // preview gradient endpoints (cold = low power, hot = full power)
+  private readonly cold = new THREE.Color(C.PALETTE.preview);
+  private readonly hot = new THREE.Color(C.PALETTE.previewHot);
+  private readonly slingCol = new THREE.Color(C.PALETTE.sling);
+  private readonly tmpCol = new THREE.Color();
 
   constructor(
     scene: THREE.Scene,
@@ -42,17 +50,17 @@ export class Slingshot {
       scene.add(arm);
     }
 
-    // elastic band: left fork tip → pouch → right fork tip
-    const elasticGeo = new THREE.BufferGeometry();
-    this.elasticPos = new THREE.BufferAttribute(new Float32Array(9), 3);
-    elasticGeo.setAttribute('position', this.elasticPos);
-    const elastic = new THREE.Line(
-      elasticGeo,
-      new THREE.LineBasicMaterial({ color: C.PALETTE.sling }),
-    );
-    elastic.position.z = 0.45;
-    elastic.frustumCulled = false;
-    scene.add(elastic);
+    // elastic: two thick bands (fork tip → pouch) and a small pouch cup. One
+    // shared material so pull tension can brighten the whole sling at once.
+    this.bandMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.sling });
+    this.bandL = new THREE.Mesh(unit, this.bandMat);
+    this.bandR = new THREE.Mesh(unit, this.bandMat);
+    this.cup = new THREE.Mesh(unit, this.bandMat);
+    for (const m of [this.bandL, this.bandR, this.cup]) {
+      m.position.z = 0.45;
+      m.frustumCulled = false;
+      scene.add(m);
+    }
 
     // dashed trajectory preview: pooled ice-cyan dots fading along the arc
     const dotGeo = new THREE.CircleGeometry(0.15, 10);
@@ -142,14 +150,28 @@ export class Slingshot {
   }
 
   private writeElastic(): void {
-    const a = this.elasticPos.array as Float32Array;
-    a[0] = C.ANCHOR.x - 0.34;
-    a[1] = C.ANCHOR.y + 0.1;
-    a[3] = this.pouch.x;
-    a[4] = this.pouch.y;
-    a[6] = C.ANCHOR.x + 0.34;
-    a[7] = C.ANCHOR.y + 0.1;
-    this.elasticPos.needsUpdate = true;
+    const fy = C.ANCHOR.y + 0.1;
+    this.layoutBand(this.bandL, C.ANCHOR.x - 0.34, fy, this.pouch.x, this.pouch.y);
+    this.layoutBand(this.bandR, C.ANCHOR.x + 0.34, fy, this.pouch.x, this.pouch.y);
+    // pouch cup: a short bar cradling the ball, perpendicular to the pull
+    this.cup.position.set(this.pouch.x, this.pouch.y, 0.45);
+    this.cup.scale.set(C.BAND_WIDTH * 1.2, C.BALL_RADIUS * 1.9, 1);
+    this.cup.rotation.z = Math.atan2(this.pouch.y - C.ANCHOR.y, this.pouch.x - C.ANCHOR.x);
+    // tension brightens the violet bands toward ice-cyan
+    const stretch = Math.min(
+      1,
+      Math.hypot(this.pouch.x - C.ANCHOR.x, this.pouch.y - C.ANCHOR.y) / C.MAX_DRAG,
+    );
+    this.bandMat.color.copy(this.slingCol).lerp(this.cold, stretch * 0.6);
+  }
+
+  /** Position a unit quad as a band from (x0,y0) to (x1,y1) with BAND_WIDTH. */
+  private layoutBand(mesh: THREE.Mesh, x0: number, y0: number, x1: number, y1: number): void {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0.45);
+    mesh.scale.set(Math.hypot(dx, dy), C.BAND_WIDTH, 1);
+    mesh.rotation.z = Math.atan2(dy, dx);
   }
 
   private hidePreview(): void {
@@ -163,6 +185,9 @@ export class Slingshot {
     }
     const vx = this.dragX * C.LAUNCH_K;
     const vy = this.dragY * C.LAUNCH_K;
+    // dots shift cyan → ember and swell near launch as power rises
+    const frac = Math.min(1, Math.hypot(this.dragX, this.dragY) / C.MAX_DRAG);
+    this.tmpCol.copy(this.cold).lerp(this.hot, frac);
     // matter's integration for a frictionAir-0 body:
     //   p[n+1] = 2·p[n] − p[n−1] + g·dt²,  setVelocity ⇒ p[−1] = p[0] − v·dt
     let px = this.pouch.x;
@@ -183,7 +208,10 @@ export class Slingshot {
         const dot = this.dots[dotIndex]!;
         dot.position.x = px;
         dot.position.y = py;
+        const s = 1 + 0.5 * frac * (1 - dotIndex / C.PREVIEW_DOTS);
+        dot.scale.set(s, s, 1);
         dot.visible = true;
+        this.dotMats[dotIndex]!.color.copy(this.tmpCol);
         dotIndex += 1;
       }
     }

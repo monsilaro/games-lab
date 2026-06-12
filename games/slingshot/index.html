@@ -101,6 +101,32 @@
         100% { opacity: 0; transform: translateY(-14px); }
       }
 
+      /* --- Star rating (level clear) ------------------------------------------ */
+      #slingshot-stars {
+        position: fixed;
+        z-index: 11;
+        top: 33%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 46px;
+        letter-spacing: 8px;
+        color: #caf0f8;
+        text-shadow: 0 0 18px rgba(202, 240, 248, 0.7);
+        opacity: 0;
+        pointer-events: none;
+      }
+      #slingshot-stars.show {
+        animation: slingshotStarsIn 1.6s ease-out;
+      }
+      @keyframes slingshotStarsIn {
+        0% { opacity: 0; transform: scale(0.4); }
+        20% { opacity: 1; transform: scale(1.15); }
+        35% { transform: scale(1); }
+        80% { opacity: 1; }
+        100% { opacity: 0; transform: scale(1); }
+      }
+
       /* --- Next-shot button --------------------------------------------------- */
       #slingshot-next-btn {
         position: fixed;
@@ -167,6 +193,7 @@
       <span id="slingshot-score-label">0</span>
     </div>
     <div id="slingshot-score-pop"></div>
+    <div id="slingshot-stars"></div>
     <button type="button" id="slingshot-next-btn">Next shot →</button>
     <div id="slingshot-build-stamp"></div>
     <div id="slingshot-game-overlay"></div>

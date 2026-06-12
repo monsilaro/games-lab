@@ -9,6 +9,7 @@ const levelLabel = el<HTMLSpanElement>('slingshot-level-label');
 const shotsBox = el<HTMLDivElement>('slingshot-shots');
 const scoreLabel = el<HTMLSpanElement>('slingshot-score-label');
 const scorePopEl = el<HTMLDivElement>('slingshot-score-pop');
+const starsEl = el<HTMLDivElement>('slingshot-stars');
 const nextBtn = el<HTMLButtonElement>('slingshot-next-btn');
 const overlay = el<HTMLDivElement>('slingshot-game-overlay');
 
@@ -43,6 +44,12 @@ export function setShots(remaining: number, total: number): void {
 export function scorePop(text: string): void {
   scorePopEl.textContent = text;
   restartAnimation(scorePopEl, 'show');
+}
+
+/** Briefly flash a 1–3 star rating on level clear. */
+export function showStars(n: number): void {
+  starsEl.textContent = '★'.repeat(n) + '☆'.repeat(Math.max(0, 3 - n));
+  restartAnimation(starsEl, 'show');
 }
 
 export function initNextButton(onTap: () => void): void {
