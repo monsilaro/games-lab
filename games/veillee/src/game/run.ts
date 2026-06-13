@@ -175,7 +175,8 @@ export function startGame(): void {
     combatEndTimer = COMBAT_END_PAUSE;
     cIid = 0;
     deselect();
-    hud.setShopVisible(false);
+    hud.setShopLocked(true); // keep the bottom bar visible but disabled (no UI hole)
+    hud.setSynergiesHidden(true); // slide the trait chips away so they don't cover the fight
     hud.hideBanner();
     hud.flashTransition();
     board.setPlacementVisible(false);
@@ -244,6 +245,8 @@ export function startGame(): void {
     hud.setPhaseLabel(null);
     board.setPlacementVisible(true);
     hud.setShopVisible(true);
+    hud.setShopLocked(false);
+    hud.setSynergiesHidden(false);
     refreshPreview();
     renderShopUi();
     renderSynergies();

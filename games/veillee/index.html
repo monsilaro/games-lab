@@ -143,6 +143,11 @@
         gap: 4px;
         max-width: 52vw;
         pointer-events: none;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+      #veillee-synergies.veillee-synergies--combat {
+        opacity: 0;
+        transform: translateX(-14px);
       }
       .veillee-syn-chip {
         display: inline-flex;
@@ -310,6 +315,11 @@
         padding: 8px calc(env(safe-area-inset-right, 0px) + 10px)
           calc(env(safe-area-inset-bottom, 0px) + 8px) calc(env(safe-area-inset-left, 0px) + 10px);
         background: linear-gradient(to top, rgba(10, 17, 40, 0.94), rgba(10, 17, 40, 0));
+        transition: opacity 0.3s ease;
+      }
+      #veillee-shop.veillee-shop--locked {
+        opacity: 0.4;
+        pointer-events: none;
       }
       #veillee-shop-offers {
         display: flex;

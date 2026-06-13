@@ -44,6 +44,8 @@ export interface Hud {
   hideUnitStats(): void;
   renderShop(shop: (ShopOffer | null)[], gold: number): void;
   setShopVisible(v: boolean): void;
+  setShopLocked(v: boolean): void;
+  setSynergiesHidden(v: boolean): void;
   flashTransition(): void;
   setPhaseLabel(text: string | null): void;
   banner(title: string, sub: string): void;
@@ -170,6 +172,17 @@ export function createHud(h: HudHandlers): Hud {
 
     setShopVisible(v) {
       shop.style.display = v ? 'flex' : 'none';
+    },
+
+    setShopLocked(v) {
+      shop.classList.toggle('veillee-shop--locked', v);
+      rerollBtn.disabled = v;
+      readyBtn.disabled = v;
+      readyBtn.textContent = v ? '⚔ En combat…' : 'Combat →';
+    },
+
+    setSynergiesHidden(v) {
+      synergies.classList.toggle('veillee-synergies--combat', v);
     },
 
     flashTransition() {
