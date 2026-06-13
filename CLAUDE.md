@@ -25,6 +25,14 @@ games-lab/
 - **Zero assets** for prototypes: colored geometry, HTML overlays for UI.
 - **No generic HTML ids** (`overlay`, `score`, `banner`, `popup`, `ad`…): ad-blocker cosmetic filters (EasyList via Brave Shields, uBlock, AdGuard) hide them, silently nuking the game UI. Prefix with the game name: `flappy-game-overlay`, `flappy-hud-score`.
 
+### Per-game exceptions
+
+- **Veillée — lit, faceted materials.** Most games use `MeshBasicMaterial` (flat, unlit). Veillée deliberately breaks this for its "Nuit de veillée" low-poly look: `MeshLambertMaterial` with `flatShading: true`, lit by a fixed rig (cold directional "moon" + faint blue ambient + warm low "lantern" point light) defined in `games/veillee/src/scene.ts` from `config.ts`. The chaud/froid contrast on facets is the whole point — don't "fix" it back to unlit. The shared ortho camera is reused and tilted ~30° for the diorama.
+
+## Veillée — Hero Forge workflow
+
+The hero roster is 100% data-driven. To iterate on a hero's silhouette: **edit `games/veillee/src/forge/heroes.ts`** (the design source of truth — one `HeroConfig` per hero), then reload **`?forge=1`** to see every hero turning on its pedestal under the real light rig. Composable parts (bodies/heads/headgear/weapons/accessories) live in `src/forge/parts.ts`; the factory that assembles them is `src/forge/heroFactory.ts`. Add a new part kind there, expose it in a `parts.ts` union, then reference it from `heroes.ts`.
+
 ## Adding a new game
 
 1. Copy an existing game: `cp -r games/flappy games/<name>` (drop its `dist/` and `node_modules/` if present).
