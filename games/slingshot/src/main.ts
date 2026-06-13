@@ -342,8 +342,9 @@ const sling = new Slingshot(scene, app, fire);
 function killTarget(target: Target): void {
   if (!target.alive || !target.body) return;
   const { x, y } = target.body.position;
+  const enemyColor = target.color;
   targets.kill(target);
-  effects.burst(x, y, 0, C.KILL_BURST); // color comes from the theme confetti palette
+  effects.burstColors(x, y, [enemyColor, enemyColor, '#fff7ec'], C.KILL_BURST);
   audio.vibrate(20);
 
   // combo: each kill this shot is worth more than the last
@@ -526,7 +527,16 @@ startGameLoop((dt) => {
   }
 
   physics.syncMeshes();
-  targets.pulse(elapsed);
+  // critters watch the ball in flight, else the loaded pouch
+  let lookX = sling.pouch.x;
+  let lookY = sling.pouch.y;
+  let lookActive = false;
+  if (state === 'flying' && ballBody) {
+    lookX = ballBody.position.x;
+    lookY = ballBody.position.y;
+    lookActive = true;
+  }
+  targets.update(elapsed, lookX, lookY, lookActive);
   effects.update(dtw);
   app.camera.position.x = camBase.x + effects.shakeOffset.x;
   app.camera.position.y = camBase.y + effects.shakeOffset.y;

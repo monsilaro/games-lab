@@ -137,6 +137,12 @@ export const TARGET_RADIUS = 0.44;
 export const TARGET_PULSE_AMP = 0.06; // scale pulse amplitude
 export const TARGET_PULSE_HZ = 1; // pulses per second
 
+// enemy characters (targets are drawn as papercraft critters — targets.ts)
+export type EnemyType = 'sprout' | 'bug' | 'fang';
+export const ENEMY_TYPES: EnemyType[] = ['sprout', 'bug', 'fang'];
+export const ENEMY_COLORS = ['#1aa18f', '#7d5fd6', '#ee5d7a', '#5fb84a']; // teal, grape, rose, leaf
+export const ENEMY_SCARE_DIST = 4.6; // ball within this (world units) → scared face
+
 // shot flow / settling
 export const SETTLE_MIN = 1.0; // s a fresh structure settles before aiming
 export const STILL_SPEED = 0.08; // units/s — "not moving" threshold

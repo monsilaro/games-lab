@@ -323,6 +323,31 @@ export function burst(x: number, y: number, _color: number, count: number): void
   }
 }
 
+/** Like burst() but seeds the bits from an explicit color palette (enemy death). */
+export function burstColors(x: number, y: number, palette: readonly string[], count: number): void {
+  let spawned = 0;
+  for (const b of bits) {
+    if (spawned >= count) break;
+    if (b.life > 0) continue;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = C.CONFETTI_SPEED * (0.4 + Math.random() * 0.8);
+    b.vx = Math.cos(angle) * speed;
+    b.vy = Math.sin(angle) * speed + 2.5;
+    b.vr = (Math.random() - 0.5) * 14;
+    b.dust = false;
+    b.max = C.CONFETTI_LIFE * (0.7 + Math.random() * 0.5);
+    b.life = b.max;
+    const size = C.CONFETTI_SIZE * (0.7 + Math.random() * 0.7);
+    b.mat.color.set(palette[(Math.random() * palette.length) | 0] ?? '#ffffff');
+    b.mesh.geometry = Math.random() < 0.45 ? triGeo : quadGeo;
+    b.mesh.scale.set(size, size, 1);
+    b.mesh.rotation.z = Math.random() * Math.PI * 2;
+    b.mesh.position.set(x, y, 0.4);
+    b.mesh.visible = true;
+    spawned += 1;
+  }
+}
+
 export function shake(): void {
   if (!shakeEnabled) return;
   shakeTime = C.SHAKE_DURATION;
