@@ -56,7 +56,7 @@ export function buildBoard(scene: THREE.Scene): Board {
     new THREE.MeshBasicMaterial({ color: PALETTE.iceCyan, transparent: true, opacity: 0.25 }),
   );
   seam.rotation.x = -Math.PI / 2;
-  seam.position.set(0, 0.03, 0);
+  seam.position.set(0, 0.05, 0);
   group.add(seam);
 
   // Placement markers (player cells + bench), hidden during combat.
@@ -68,15 +68,15 @@ export function buildBoard(scene: THREE.Scene): Board {
     for (let c = 0; c < cols; c++) {
       const m = new THREE.Mesh(cellGeo, cellMat);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(colX(c), 0.02, playerZ(r));
+      m.position.set(colX(c), 0.06, playerZ(r)); // clearly above the snow top (y≈0.02) to avoid z-fighting
       placement.add(m);
       // crisp outline so the grid reads even when faint
       const edge = new THREE.LineSegments(
         new THREE.EdgesGeometry(cellGeo),
-        new THREE.LineBasicMaterial({ color: PALETTE.iceCyan, transparent: true, opacity: 0.22 }),
+        new THREE.LineBasicMaterial({ color: PALETTE.iceCyan, transparent: true, opacity: 0.35 }),
       );
       edge.rotation.x = -Math.PI / 2;
-      edge.position.set(colX(c), 0.025, playerZ(r));
+      edge.position.set(colX(c), 0.065, playerZ(r));
       placement.add(edge);
     }
   }
@@ -84,7 +84,7 @@ export function buildBoard(scene: THREE.Scene): Board {
   for (let i = 0; i < ECONOMY.benchSize; i++) {
     const m = new THREE.Mesh(cellGeo, benchMat);
     m.rotation.x = -Math.PI / 2;
-    m.position.set(colX(i), 0.02, benchZ);
+    m.position.set(colX(i), 0.06, benchZ);
     placement.add(m);
   }
 
