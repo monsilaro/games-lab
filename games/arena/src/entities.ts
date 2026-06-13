@@ -3,10 +3,17 @@ import * as C from './config';
 
 // z-layers (ortho camera looks down -z; higher z draws on top)
 const Z = {
+  magnet: 0.08, // faint pickup-radius rim, under the horde
+  aura: 0.12, // warmth aura ground glow, under the horde
   gem: 0.3,
   enemy: 0.5,
-  halo: 0.68,
+  halo: 0.64,
+  playerTrail: 0.66,
+  playerRing: 0.69,
   player: 0.7,
+  playerInner: 0.71,
+  barrel: 0.72,
+  orbital: 0.74,
   trail: 0.76,
   projectile: 0.8,
   particle: 0.9,
@@ -18,6 +25,7 @@ const squareGeo = new THREE.PlaneGeometry(1, 1);
 const triangleGeo = new THREE.CircleGeometry(1, 3);
 const diamondGeo = new THREE.CircleGeometry(1, 4);
 const particleGeo = new THREE.PlaneGeometry(0.14, 0.14);
+const ringGeo = new THREE.RingGeometry(0.74, 1.0, 36); // unit ring band, scaled per use
 
 // Shared materials — pools swap references, never clone. Fades are done by
 // scaling to zero so opacity (and thus per-mesh materials) is never needed.
@@ -27,6 +35,24 @@ const playerMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.player });
 const flashMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.flash });
 const projectileMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.projectile });
 const gemMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.gem });
+// Frozen tint for slowed enemies (ice-cyan).
+const slowMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.gem });
+
+// Player glow-up materials (additive, warm).
+const playerInnerMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.projectile });
+const barrelMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.projectile });
+const additive = (color: number, opacity: number): THREE.MeshBasicMaterial =>
+  new THREE.MeshBasicMaterial({
+    color, opacity, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+const playerRingMat = additive(C.PALETTE.projectile, 0.8);
+const playerTrailMat = additive(C.PALETTE.player, 0.5);
+const auraMat = additive(C.PALETTE.player, 0.16); // soft warm pool under the horde
+const magnetMat = additive(C.PALETTE.gem, 0.16);
+// Big icy comet projectile + its trail.
+const cometMat = additive(C.PALETTE.gem, 0.95);
+const orbitalMat = additive(C.PALETTE.gem, 0.95);
 
 export type EnemyType = 'chaser' | 'runner';
 
@@ -52,13 +78,42 @@ export class Player {
   kbX = 0;
   kbY = 0;
   invuln = 0;
-  private readonly mesh: THREE.Mesh;
+
+  // Layered body + facing barrel + glow.
+  private readonly core: THREE.Mesh;
+  private readonly inner: THREE.Mesh;
+  private readonly ring: THREE.Mesh;
+  private readonly barrel: THREE.Mesh;
   private readonly halo: THREE.Sprite;
+  // Build-driven rings (warmth aura + magnet rim) and the motion trail.
+  private readonly aura: THREE.Mesh;
+  private readonly magnetRing: THREE.Mesh;
+  private readonly trail: THREE.Mesh[] = [];
+  private readonly histX: number[];
+  private readonly histY: number[];
+
+  private aimAngle = 0; // smoothed facing
+  private aimTarget = 0; // desired facing (toward nearest enemy)
+  private firePulse = 0; // s remaining on the muzzle punch
+  private prevX = 0;
+  private prevY = 0;
+  private speed = 0; // units/s, derived from position delta
+  private auraRadius = 0; // 0 = aura off
+  private magnetRadius = 0;
 
   constructor(scene: THREE.Scene) {
-    this.mesh = new THREE.Mesh(discGeo, playerMat);
-    this.mesh.scale.setScalar(C.PLAYER_RADIUS);
-    this.mesh.position.z = Z.player;
+    this.core = new THREE.Mesh(discGeo, playerMat);
+    this.core.position.z = Z.player;
+
+    this.inner = new THREE.Mesh(discGeo, playerInnerMat);
+    this.inner.position.z = Z.playerInner;
+
+    this.ring = new THREE.Mesh(ringGeo, playerRingMat);
+    this.ring.position.z = Z.playerRing;
+
+    this.barrel = new THREE.Mesh(triangleGeo, barrelMat);
+    this.barrel.position.z = Z.barrel;
+
     // Soft additive ember glow behind the player — the only warm light.
     this.halo = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -69,9 +124,50 @@ export class Player {
         opacity: 0.6,
       }),
     );
-    this.halo.scale.setScalar(C.PLAYER_RADIUS * 6);
     this.halo.position.z = Z.halo;
-    scene.add(this.halo, this.mesh);
+
+    // Filled disc (not a rim) so the warmth reads as a pool the horde wades into.
+    this.aura = new THREE.Mesh(discGeo, auraMat);
+    this.aura.position.z = Z.aura;
+    this.aura.visible = false;
+
+    this.magnetRing = new THREE.Mesh(ringGeo, magnetMat);
+    this.magnetRing.position.z = Z.magnet;
+    this.magnetRing.visible = false;
+
+    this.histX = new Array<number>(C.PLAYER_TRAIL_LENGTH).fill(0);
+    this.histY = new Array<number>(C.PLAYER_TRAIL_LENGTH).fill(0);
+    for (let i = 0; i < C.PLAYER_TRAIL_LENGTH; i++) {
+      const ghost = new THREE.Mesh(discGeo, playerTrailMat);
+      ghost.position.z = Z.playerTrail;
+      ghost.visible = false;
+      this.trail.push(ghost);
+      scene.add(ghost);
+    }
+
+    scene.add(this.magnetRing, this.aura, this.halo, this.ring, this.core, this.inner, this.barrel);
+  }
+
+  /** Point the barrel toward a world position (the nearest enemy). */
+  setAim(tx: number, ty: number): void {
+    this.aimTarget = Math.atan2(ty - this.y, tx - this.x);
+  }
+
+  /** Muzzle punch — call on every shot fired. */
+  pulse(): void {
+    this.firePulse = C.FIRE_PULSE_TIME;
+  }
+
+  /** Show/size the warmth aura ("Brasier"); level 0 hides it. */
+  setAura(level: number): void {
+    this.auraRadius = level > 0 ? C.AURA_RADIUS_BASE + (level - 1) * C.AURA_RADIUS_PER : 0;
+    this.aura.visible = level > 0;
+  }
+
+  /** Show/size the magnet rim so pickup-radius growth is legible. */
+  setMagnet(radius: number): void {
+    this.magnetRadius = radius;
+    this.magnetRing.visible = radius > 0;
   }
 
   reset(x: number, y: number): void {
@@ -80,23 +176,106 @@ export class Player {
     this.kbX = 0;
     this.kbY = 0;
     this.invuln = 0;
-    this.mesh.visible = true;
+    this.aimAngle = 0;
+    this.aimTarget = 0;
+    this.firePulse = 0;
+    this.prevX = x;
+    this.prevY = y;
+    this.speed = 0;
+    this.histX.fill(x);
+    this.histY.fill(y);
+    this.core.visible = true;
+    this.inner.visible = true;
+    this.ring.visible = true;
+    this.barrel.visible = true;
     this.halo.visible = true;
+    for (const g of this.trail) g.visible = false;
   }
 
   hide(): void {
-    this.mesh.visible = false;
+    this.core.visible = false;
+    this.inner.visible = false;
+    this.ring.visible = false;
+    this.barrel.visible = false;
     this.halo.visible = false;
+    this.aura.visible = false;
+    this.magnetRing.visible = false;
+    for (const g of this.trail) g.visible = false;
   }
 
-  /** Position sync + invincibility blink. Call every frame while alive. */
-  sync(elapsed: number): void {
-    this.mesh.position.x = this.x;
-    this.mesh.position.y = this.y;
-    this.halo.position.x = this.x;
-    this.halo.position.y = this.y;
-    this.mesh.visible =
-      this.invuln <= 0 || Math.sin(elapsed * C.BLINK_HZ * Math.PI * 2) > 0;
+  /** Position sync + animation + invincibility blink. Call every frame while alive. */
+  sync(elapsed: number, dt: number): void {
+    const r = C.PLAYER_RADIUS;
+    this.speed = dt > 0 ? Math.hypot(this.x - this.prevX, this.y - this.prevY) / dt : 0;
+    const moving = this.speed > 0.25;
+
+    // Smoothly turn the barrel toward the target (shortest angular path).
+    const delta = Math.atan2(
+      Math.sin(this.aimTarget - this.aimAngle),
+      Math.cos(this.aimTarget - this.aimAngle),
+    );
+    this.aimAngle += delta * Math.min(1, 12 * dt);
+
+    this.firePulse = Math.max(0, this.firePulse - dt);
+    const fp = this.firePulse / C.FIRE_PULSE_TIME; // 1 → 0
+    const bob = moving ? 0 : Math.sin(elapsed * 3) * 0.04;
+    const cx = this.x;
+    const cy = this.y + bob;
+
+    const pop = 1 + 0.18 * fp;
+    this.core.position.set(cx, cy, Z.player);
+    this.core.scale.setScalar(r * pop);
+    this.inner.position.set(cx, cy, Z.playerInner);
+    this.inner.scale.setScalar(r * 0.45 * (1 + 0.4 * fp));
+    this.ring.position.set(cx, cy, Z.playerRing);
+    this.ring.rotation.z += dt * 0.6;
+    this.ring.scale.setScalar(r * 1.35 * (1 + 0.12 * fp));
+
+    const bx = cx + Math.cos(this.aimAngle) * r * 1.05;
+    const by = cy + Math.sin(this.aimAngle) * r * 1.05;
+    this.barrel.position.set(bx, by, Z.barrel);
+    this.barrel.rotation.z = this.aimAngle;
+    this.barrel.scale.setScalar(r * (0.62 + 0.18 * fp));
+
+    this.halo.position.set(cx, cy, Z.halo);
+    this.halo.scale.setScalar(r * 6 * (1 + 0.25 * fp));
+
+    if (this.auraRadius > 0) {
+      this.aura.position.set(this.x, this.y, Z.aura);
+      this.aura.scale.setScalar(this.auraRadius * (1 + 0.06 * Math.sin(elapsed * 4)));
+    }
+    if (this.magnetRadius > 0) {
+      this.magnetRing.position.set(this.x, this.y, Z.magnet);
+      this.magnetRing.scale.setScalar(this.magnetRadius * (1 + 0.04 * Math.sin(elapsed * 2.5)));
+    }
+
+    // Motion trail: afterimage ghosts lagging behind, scaled by speed so faster
+    // builds (Swift) leave a longer, brighter wake; they vanish when idle.
+    for (let i = C.PLAYER_TRAIL_LENGTH - 1; i > 0; i--) {
+      this.histX[i] = this.histX[i - 1] ?? this.x;
+      this.histY[i] = this.histY[i - 1] ?? this.y;
+    }
+    this.histX[0] = this.x;
+    this.histY[0] = this.y;
+    const tf = Math.min(1, this.speed / 5);
+    for (let i = 0; i < this.trail.length; i++) {
+      const g = this.trail[i];
+      if (!g) continue;
+      const s = r * (1 - i / this.trail.length) * 0.85 * tf;
+      g.visible = s > 0.02;
+      g.position.set(this.histX[i] ?? this.x, this.histY[i] ?? this.y, Z.playerTrail);
+      g.scale.setScalar(s);
+    }
+
+    // Invincibility blink — only the solid body parts flicker.
+    const visible = this.invuln <= 0 || Math.sin(elapsed * C.BLINK_HZ * Math.PI * 2) > 0;
+    this.core.visible = visible;
+    this.inner.visible = visible;
+    this.ring.visible = visible;
+    this.barrel.visible = visible;
+
+    this.prevX = this.x;
+    this.prevY = this.y;
   }
 }
 
@@ -116,6 +295,8 @@ export interface Enemy {
   kbY: number;
   flash: number;
   spin: number;
+  slow: number; // s remaining of comet freeze
+  orbCd: number; // s before an orbital can hit this enemy again
 }
 
 export class EnemyPool {
@@ -130,6 +311,7 @@ export class EnemyPool {
       this.list.push({
         mesh, active: false, type: 'chaser', x: 0, y: 0, hp: 1,
         speed: 0, damage: 0, radius: 0.5, xp: 1, kbX: 0, kbY: 0, flash: 0, spin: 0,
+        slow: 0, orbCd: 0,
       });
     }
   }
@@ -156,6 +338,8 @@ export class EnemyPool {
     e.kbX = 0;
     e.kbY = 0;
     e.flash = 0;
+    e.slow = 0;
+    e.orbCd = 0;
     e.spin = (Math.random() - 0.5) * 2;
     e.mesh.geometry = type === 'chaser' ? squareGeo : triangleGeo;
     e.mesh.material = type === 'chaser' ? chaserMat : runnerMat;
@@ -186,12 +370,13 @@ export class EnemyPool {
 
     for (const e of this.list) {
       if (!e.active) continue;
-      // dumb AI: head straight for the player
+      // dumb AI: head straight for the player (slowed while frozen by a comet)
+      const sp = e.slow > 0 ? e.speed * C.COMET_SLOW_FACTOR : e.speed;
       const dx = px - e.x;
       const dy = py - e.y;
       const len = Math.hypot(dx, dy) || 1;
-      e.x += ((dx / len) * e.speed + e.kbX) * dt;
-      e.y += ((dy / len) * e.speed + e.kbY) * dt;
+      e.x += ((dx / len) * sp + e.kbX) * dt;
+      e.y += ((dy / len) * sp + e.kbY) * dt;
       e.kbX *= kbDecay;
       e.kbY *= kbDecay;
       if (e.type === 'runner') {
@@ -200,6 +385,8 @@ export class EnemyPool {
         e.mesh.rotation.z += e.spin * dt;
       }
       if (e.flash > 0) e.flash -= dt;
+      if (e.slow > 0) e.slow -= dt;
+      if (e.orbCd > 0) e.orbCd -= dt;
     }
 
     // O(n²) pairwise separation keeps the horde from collapsing into one blob.
@@ -233,9 +420,12 @@ export class EnemyPool {
       const size = e.type === 'chaser' ? e.radius * 2 : e.radius * 1.6;
       const punch = e.flash > 0 ? 1 + 0.35 * (e.flash / C.HIT_FLASH_TIME) : 1;
       e.mesh.scale.setScalar(size * punch);
+      // flash (hit) wins, then frozen tint, then the base color.
       e.mesh.material = e.flash > 0
         ? flashMat
-        : e.type === 'chaser' ? chaserMat : runnerMat;
+        : e.slow > 0
+          ? slowMat
+          : e.type === 'chaser' ? chaserMat : runnerMat;
     }
   }
 }
@@ -246,6 +436,7 @@ interface Projectile {
   readonly trail: THREE.Mesh[];
   readonly histX: number[];
   readonly histY: number[];
+  readonly hitSet: Set<Enemy>; // enemies already pierced (comet only)
   active: boolean;
   x: number;
   y: number;
@@ -255,6 +446,9 @@ interface Projectile {
   traveled: number;
   range: number;
   damage: number;
+  radius: number;
+  pierce: boolean; // passes through enemies (comet)
+  slow: boolean; // freezes enemies it hits (comet)
 }
 
 const TRAIL_SCALES = [0.65, 0.42, 0.24];
@@ -282,7 +476,9 @@ export class ProjectilePool {
         mesh, trail,
         histX: new Array<number>(C.TRAIL_LENGTH).fill(0),
         histY: new Array<number>(C.TRAIL_LENGTH).fill(0),
+        hitSet: new Set<Enemy>(),
         active: false, x: 0, y: 0, vx: 0, vy: 0, speed: 0, traveled: 0, range: 0, damage: 0,
+        radius: C.PROJECTILE_RADIUS, pierce: false, slow: false,
       });
     }
   }
@@ -290,6 +486,7 @@ export class ProjectilePool {
   spawn(
     x: number, y: number, dirX: number, dirY: number,
     speed: number, damage: number, range: number,
+    radius = C.PROJECTILE_RADIUS, pierce = false, slow = false,
   ): void {
     const p = this.list.find((it) => !it.active);
     if (!p) return;
@@ -302,10 +499,24 @@ export class ProjectilePool {
     p.traveled = 0;
     p.range = range;
     p.damage = damage;
+    p.radius = radius;
+    p.pierce = pierce;
+    p.slow = slow;
+    p.hitSet.clear();
     p.histX.fill(x);
     p.histY.fill(y);
+    // Comet shots are big icy piercers; normal shots stay warm.
+    const mat = pierce ? cometMat : projectileMat;
+    p.mesh.material = mat;
+    p.mesh.scale.setScalar(radius);
     p.mesh.visible = true;
-    for (const tm of p.trail) tm.visible = true;
+    for (let t = 0; t < p.trail.length; t++) {
+      const tm = p.trail[t];
+      if (!tm) continue;
+      tm.material = mat;
+      tm.scale.setScalar(radius * (TRAIL_SCALES[t] ?? 0.3));
+      tm.visible = true;
+    }
   }
 
   private free(p: Projectile): void {
@@ -318,7 +529,10 @@ export class ProjectilePool {
     for (const p of this.list) this.free(p);
   }
 
-  update(dt: number, enemies: Enemy[], onHit: (e: Enemy, damage: number) => void): void {
+  update(
+    dt: number, enemies: Enemy[],
+    onHit: (e: Enemy, damage: number, slow: boolean) => void,
+  ): void {
     const boundX = C.MAP_WIDTH / 2;
     const boundY = C.MAP_HEIGHT / 2;
     for (const p of this.list) {
@@ -343,21 +557,35 @@ export class ProjectilePool {
         continue;
       }
 
-      let hit: Enemy | null = null;
-      for (const e of enemies) {
-        if (!e.active) continue;
-        const dx = e.x - p.x;
-        const dy = e.y - p.y;
-        const r = e.radius + C.PROJECTILE_RADIUS;
-        if (dx * dx + dy * dy < r * r) {
-          hit = e;
-          break;
+      if (p.pierce) {
+        // Comet: damage every enemy on its line once, then fly on (freed by range).
+        for (const e of enemies) {
+          if (!e.active || p.hitSet.has(e)) continue;
+          const dx = e.x - p.x;
+          const dy = e.y - p.y;
+          const r = e.radius + p.radius;
+          if (dx * dx + dy * dy < r * r) {
+            p.hitSet.add(e);
+            onHit(e, p.damage, p.slow);
+          }
         }
-      }
-      if (hit) {
-        this.free(p);
-        onHit(hit, p.damage);
-        continue;
+      } else {
+        let hit: Enemy | null = null;
+        for (const e of enemies) {
+          if (!e.active) continue;
+          const dx = e.x - p.x;
+          const dy = e.y - p.y;
+          const r = e.radius + p.radius;
+          if (dx * dx + dy * dy < r * r) {
+            hit = e;
+            break;
+          }
+        }
+        if (hit) {
+          this.free(p);
+          onHit(hit, p.damage, p.slow);
+          continue;
+        }
       }
 
       p.mesh.position.x = p.x;
@@ -368,6 +596,61 @@ export class ProjectilePool {
         tm.position.x = p.histX[i] ?? p.x;
         tm.position.y = p.histY[i] ?? p.y;
       }
+    }
+  }
+}
+
+// --- Orbiting sentinels ("Sentinelle") -------------------------------------------------
+export interface Orbital {
+  readonly mesh: THREE.Mesh;
+  active: boolean;
+  x: number;
+  y: number;
+}
+
+export class OrbitalPool {
+  readonly list: Orbital[] = [];
+  private angle = 0;
+  private count = 0;
+
+  constructor(scene: THREE.Scene) {
+    for (let i = 0; i < C.ORBITAL_POOL; i++) {
+      const mesh = new THREE.Mesh(discGeo, orbitalMat);
+      mesh.scale.setScalar(C.ORBITAL_SIZE);
+      mesh.position.z = Z.orbital;
+      mesh.visible = false;
+      scene.add(mesh);
+      this.list.push({ mesh, active: false, x: 0, y: 0 });
+    }
+  }
+
+  setCount(n: number): void {
+    this.count = Math.max(0, Math.min(C.ORBITAL_POOL, n));
+  }
+
+  reset(): void {
+    this.count = 0;
+    this.angle = 0;
+    for (const o of this.list) {
+      o.active = false;
+      o.mesh.visible = false;
+    }
+  }
+
+  update(dt: number, px: number, py: number): void {
+    this.angle += C.ORBITAL_SPEED * dt;
+    const step = this.count > 0 ? (Math.PI * 2) / this.count : 0;
+    for (let i = 0; i < this.list.length; i++) {
+      const o = this.list[i];
+      if (!o) continue;
+      const active = i < this.count;
+      o.active = active;
+      o.mesh.visible = active;
+      if (!active) continue;
+      const a = this.angle + i * step;
+      o.x = px + Math.cos(a) * C.ORBITAL_RADIUS;
+      o.y = py + Math.sin(a) * C.ORBITAL_RADIUS;
+      o.mesh.position.set(o.x, o.y, Z.orbital);
     }
   }
 }

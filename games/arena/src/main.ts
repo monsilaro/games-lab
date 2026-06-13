@@ -10,7 +10,9 @@ import {
 import * as C from './config';
 import { basePlayerStats, type PlayerStats } from './config';
 import { FollowCamera } from './camera';
-import { EnemyPool, GemPool, ParticlePool, Player, ProjectilePool, type Enemy } from './entities';
+import {
+  EnemyPool, GemPool, OrbitalPool, ParticlePool, Player, ProjectilePool, type Enemy,
+} from './entities';
 import * as hud from './hud';
 import { Joystick } from './input';
 import { rollUpgrades } from './upgrades';
@@ -66,6 +68,7 @@ const { scene } = app;
 const player = new Player(scene);
 const enemies = new EnemyPool(scene);
 const projectiles = new ProjectilePool(scene);
+const orbitals = new OrbitalPool(scene);
 const gems = new GemPool(scene);
 const particles = new ParticlePool(scene);
 const joystick = new Joystick();
@@ -80,11 +83,32 @@ let level = 1;
 let xp = 0;
 let kills = 0;
 let fireTimer = 0;
+let shotCount = 0; // for comet cadence
 let elapsed = 0;
 let stateChangedAt = 0;
 
 function xpNeeded(): number {
   return C.XP_BASE + (level - 1) * C.XP_GROWTH;
+}
+
+/** Shots between comets shrinks as the Comète upgrade stacks. */
+function cometInterval(): number {
+  return Math.max(C.COMET_INTERVAL_MIN, C.COMET_INTERVAL_BASE - (stats.cometLevel - 1));
+}
+
+/** Projectile radius grows with damage so Power picks are visible. */
+function projectileRadius(): number {
+  return Math.min(
+    C.PROJECTILE_RADIUS_MAX,
+    C.PROJECTILE_RADIUS + (stats.damage - C.PLAYER_BASE.damage) * C.PROJECTILE_DMG_SCALE,
+  );
+}
+
+/** Refresh the build-driven player rings after a stat change. */
+function refreshPlayerRings(): void {
+  player.setAura(stats.auraLevel);
+  player.setMagnet(stats.magnetRadius);
+  orbitals.setCount(stats.orbitalCount);
 }
 
 // --- Leaderboard (shared games-lab service) -----------------------------------
@@ -116,12 +140,15 @@ function startGame(): void {
   xp = 0;
   kills = 0;
   fireTimer = 0;
+  shotCount = 0;
   player.reset(0, 0);
   enemies.reset();
   projectiles.reset();
+  orbitals.reset();
   gems.reset();
   particles.reset();
   waves.reset();
+  refreshPlayerRings();
   cam.snapTo(0, 0);
   hud.hideOverlay();
   hud.hideUpgradeCards();
@@ -142,6 +169,7 @@ function gameOver(): void {
   particles.burst(player.x, player.y, 'player', C.DEATH_BURST * 3);
   cam.shake();
   player.hide();
+  orbitals.reset();
   hud.setHudVisible(false);
   hud.showOverlay('Game over', [
     `Wave ${waves.wave} · ${kills} kills`,
@@ -162,6 +190,14 @@ function enterLevelUp(): void {
     xp -= xpNeeded();
     level += 1;
     upgrade.apply(stats);
+    refreshPlayerRings();
+    // Pickup juice — a warm burst at the player so every pick is felt; the heal
+    // upgrade gets a bigger bloom.
+    particles.burst(
+      player.x, player.y, 'player',
+      upgrade.title === 'Vitality' ? C.DEATH_BURST * 4 : C.DEATH_BURST * 2,
+    );
+    player.pulse();
     hud.setHp(stats.hp, stats.maxHp);
     hud.setXp(xp, xpNeeded(), level);
     hud.hideUpgradeCards();
@@ -200,9 +236,9 @@ function onEnemyKilled(e: Enemy): void {
   enemies.free(e);
 }
 
-function nearestEnemyInRange(): Enemy | null {
+function nearestEnemy(): { e: Enemy; d2: number } | null {
   let best: Enemy | null = null;
-  let bestD2 = stats.attackRange * stats.attackRange;
+  let bestD2 = Infinity;
   for (const e of enemies.list) {
     if (!e.active) continue;
     const dx = e.x - player.x;
@@ -213,7 +249,7 @@ function nearestEnemyInRange(): Enemy | null {
       best = e;
     }
   }
-  return best;
+  return best ? { e: best, d2: bestD2 } : null;
 }
 
 // --- Per-frame simulation (only while playing) ----------------------------------------
@@ -259,27 +295,84 @@ function updateWorld(dt: number): void {
   }
   if (state !== 'playing') return; // died this frame
 
-  // auto-attack the nearest enemy in range
+  // aim the barrel at the nearest enemy (regardless of range)
+  const near = nearestEnemy();
+  if (near) player.setAim(near.e.x, near.e.y);
+
+  // auto-attack when the nearest enemy is in range
   fireTimer -= dt;
   if (fireTimer <= 0) {
-    const target = nearestEnemyInRange();
-    if (target) {
-      const dx = target.x - player.x;
-      const dy = target.y - player.y;
-      const len = Math.hypot(dx, dy) || 1;
-      projectiles.spawn(
-        player.x, player.y, dx / len, dy / len,
-        stats.projectileSpeed, stats.damage, stats.attackRange * 1.25,
-      );
+    if (near && near.d2 <= stats.attackRange * stats.attackRange) {
+      const e = near.e;
+      const baseAngle = Math.atan2(e.y - player.y, e.x - player.x);
+      const range = stats.attackRange * 1.25;
+      shotCount += 1;
+      const isComet = stats.cometLevel > 0 && shotCount % cometInterval() === 0;
+      if (isComet) {
+        // one big icy comet — pierces the line and freezes everything it touches
+        projectiles.spawn(
+          player.x, player.y, Math.cos(baseAngle), Math.sin(baseAngle),
+          stats.projectileSpeed * C.COMET_SPEED_MULT,
+          stats.damage * C.COMET_DMG_MULT, range,
+          C.COMET_RADIUS, true, true,
+        );
+      } else {
+        // normal volley, fanned out by projectileCount (multishot)
+        const r = projectileRadius();
+        const n = stats.projectileCount;
+        for (let k = 0; k < n; k++) {
+          const a = baseAngle + (k - (n - 1) / 2) * C.MULTISHOT_SPREAD;
+          projectiles.spawn(
+            player.x, player.y, Math.cos(a), Math.sin(a),
+            stats.projectileSpeed, stats.damage, range, r,
+          );
+        }
+      }
+      player.pulse();
       fireTimer = stats.fireInterval;
     } else {
       fireTimer = 0; // don't bank shots while nothing is in range
     }
   }
 
-  projectiles.update(dt, enemies.list, (enemy, damage) => {
+  projectiles.update(dt, enemies.list, (enemy, damage, slow) => {
+    if (slow) enemy.slow = C.COMET_SLOW_TIME;
     if (enemies.damage(enemy, damage)) onEnemyKilled(enemy);
   });
+
+  // orbiting sentinels: advance, then damage what they touch (per-enemy cooldown)
+  orbitals.update(dt, player.x, player.y);
+  if (stats.orbitalCount > 0) {
+    for (const o of orbitals.list) {
+      if (!o.active) continue;
+      for (const e of enemies.list) {
+        if (!e.active || e.orbCd > 0) continue;
+        const dx = e.x - o.x;
+        const dy = e.y - o.y;
+        const rr = e.radius + C.ORBITAL_SIZE;
+        if (dx * dx + dy * dy < rr * rr) {
+          e.orbCd = C.ORBITAL_HIT_CD;
+          if (enemies.damage(e, C.ORBITAL_DAMAGE)) onEnemyKilled(e);
+        }
+      }
+    }
+  }
+
+  // warmth aura ("Brasier"): continuous drain on enemies inside the ring
+  if (stats.auraLevel > 0) {
+    const radius = C.AURA_RADIUS_BASE + (stats.auraLevel - 1) * C.AURA_RADIUS_PER;
+    const dmg = (C.AURA_DPS_BASE + (stats.auraLevel - 1) * C.AURA_DPS_PER) * dt;
+    const r2 = radius * radius;
+    for (const e of enemies.list) {
+      if (!e.active) continue;
+      const dx = e.x - player.x;
+      const dy = e.y - player.y;
+      if (dx * dx + dy * dy <= r2) {
+        e.hp -= dmg; // raw drain — no per-frame flash spam; the ring is the tell
+        if (e.hp <= 0) onEnemyKilled(e);
+      }
+    }
+  }
 
   gems.update(dt, player.x, player.y, stats.magnetRadius, elapsed, gainXp);
   particles.update(dt);
@@ -315,7 +408,7 @@ startGameLoop((dt) => {
   } else if (state === 'gameover') {
     particles.update(dt); // let the death burst finish
   }
-  if (state !== 'gameover') player.sync(elapsed);
+  if (state !== 'gameover') player.sync(elapsed, dt);
   cam.update(player.x, player.y, dt);
   app.renderer.render(scene, app.camera);
 }, C.MAX_DT);

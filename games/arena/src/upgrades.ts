@@ -43,6 +43,30 @@ export const UPGRADE_POOL: Upgrade[] = [
     desc: `+${pct(V.magnetMult)} pickup radius`,
     apply: (s) => { s.magnetRadius *= V.magnetMult; },
   },
+  {
+    icon: '🎯',
+    title: 'Éventail',
+    desc: '+1 projectile (tir en éventail)',
+    apply: (s) => { s.projectileCount += 1; },
+  },
+  {
+    icon: '🪐',
+    title: 'Sentinelle',
+    desc: '+1 orbe qui blesse au contact',
+    apply: (s) => { s.orbitalCount += 1; },
+  },
+  {
+    icon: '🏮',
+    title: 'Brasier',
+    desc: 'Aura de chaleur qui brûle la horde',
+    apply: (s) => { s.auraLevel += 1; },
+  },
+  {
+    icon: '☄️',
+    title: 'Comète',
+    desc: 'Tir glaciaire perçant qui ralentit',
+    apply: (s) => { s.cometLevel += 1; },
+  },
 ];
 
 /** Fisher–Yates shuffle of the pool, then take the first `count` cards. */
