@@ -336,8 +336,12 @@ export function startGame(): void {
 
   // ---------- drag placement (shop only) ----------
   const proj = new THREE.Vector3();
+  const DRAG_PX = 10; // movement beyond this = a drag; below = a tap (select only)
   let dragging: OwnedUnit | null = null;
   let selected: OwnedUnit | null = null;
+  let downX = 0;
+  let downY = 0;
+  let moved = false;
 
   function pickUnit(cx: number, cy: number): OwnedUnit | null {
     let best: OwnedUnit | null = null;
@@ -379,6 +383,9 @@ export function startGame(): void {
     if (phase !== 'shop') return;
     const picked = pickUnit(e.clientX, e.clientY);
     dragging = picked;
+    downX = e.clientX;
+    downY = e.clientY;
+    moved = false;
     if (picked) {
       selected = picked;
       showStats(picked);
@@ -389,15 +396,24 @@ export function startGame(): void {
   });
   window.addEventListener('pointermove', (e: PointerEvent) => {
     if (!dragging) return;
+    if (!moved) {
+      const dx = e.clientX - downX;
+      const dy = e.clientY - downY;
+      if (dx * dx + dy * dy > DRAG_PX * DRAG_PX) moved = true;
+    }
+    if (!moved) return; // still a tap — don't move the unit yet
     const p = pointerToBoard(app, e.clientX, e.clientY, board);
     const v = views.get(dragging.iid);
     if (p && v) v.setSlotPosition(p.x, p.z);
   });
   window.addEventListener('pointerup', (e: PointerEvent) => {
     if (!dragging) return;
-    const p = pointerToBoard(app, e.clientX, e.clientY, board);
-    const slot = p ? board.nearestSlot(p) : null;
-    if (slot) dropTo(dragging, slot);
+    // Only relocate on an actual drag; a tap just selects (shown on pointerdown).
+    if (moved) {
+      const p = pointerToBoard(app, e.clientX, e.clientY, board);
+      const slot = p ? board.nearestSlot(p) : null;
+      if (slot) dropTo(dragging, slot);
+    }
     dragging = null;
     refreshPreview();
     renderHud();
