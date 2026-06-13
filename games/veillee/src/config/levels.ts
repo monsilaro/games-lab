@@ -56,43 +56,40 @@ export const LEVELS: EnemyPlacement[][] = [
     { heroId: 'chasse-galerie', star: 1, col: 0, row: 1 },
     { heroId: 'dame-blanche', star: 1, col: 3, row: 3 },
   ],
-  // 7 — a full front line + double back-line casters (8)
+  // 7 — front line firms up, a couple ★2 carries (7) — a gentle step from 6
   [
     { heroId: 'bucheron', star: 2, col: 1, row: 0 },
     { heroId: 'loup-garou', star: 2, col: 2, row: 0 },
-    { heroId: 'windigo', star: 2, col: 0, row: 0 },
-    { heroId: 'draveur', star: 2, col: 3, row: 0 },
-    { heroId: 'la-corriveau', star: 2, col: 1, row: 3 },
-    { heroId: 'coureur-des-bois', star: 2, col: 2, row: 3 },
-    { heroId: 'dame-blanche', star: 2, col: 0, row: 2 },
-    { heroId: 'feu-follet', star: 2, col: 3, row: 2 },
+    { heroId: 'windigo', star: 1, col: 0, row: 0 },
+    { heroId: 'draveur', star: 1, col: 3, row: 0 },
+    { heroId: 'coureur-des-bois', star: 2, col: 1, row: 3 },
+    { heroId: 'la-corriveau', star: 1, col: 2, row: 3 },
+    { heroId: 'dame-blanche', star: 1, col: 0, row: 2 },
   ],
-  // 8 — two rows of bruisers + ★3 carries (10)
+  // 8 — bigger board, first ★3 carry (9)
+  [
+    { heroId: 'windigo', star: 2, col: 1, row: 0 },
+    { heroId: 'bucheron', star: 2, col: 2, row: 0 },
+    { heroId: 'loup-garou', star: 2, col: 0, row: 0 },
+    { heroId: 'draveur', star: 1, col: 3, row: 0 },
+    { heroId: 'carcajou', star: 1, col: 1, row: 1 },
+    { heroId: 'coureur-des-bois', star: 3, col: 2, row: 3 },
+    { heroId: 'la-corriveau', star: 2, col: 1, row: 3 },
+    { heroId: 'dame-blanche', star: 2, col: 0, row: 3 },
+    { heroId: 'feu-follet', star: 2, col: 3, row: 3 },
+  ],
+  // 9 — a wall of ★3 bruisers, healer-backed (10)
   [
     { heroId: 'windigo', star: 3, col: 1, row: 0 },
     { heroId: 'bucheron', star: 3, col: 2, row: 0 },
     { heroId: 'loup-garou', star: 2, col: 0, row: 0 },
     { heroId: 'draveur', star: 2, col: 3, row: 0 },
     { heroId: 'carcajou', star: 2, col: 1, row: 1 },
-    { heroId: 'loup-garou', star: 2, col: 2, row: 1 },
-    { heroId: 'la-corriveau', star: 2, col: 1, row: 3 },
-    { heroId: 'coureur-des-bois', star: 3, col: 2, row: 3 },
-    { heroId: 'dame-blanche', star: 2, col: 0, row: 3 },
-    { heroId: 'feu-follet', star: 3, col: 3, row: 3 },
-  ],
-  // 9 — a wall of ★3 bruisers, healer-backed (11)
-  [
-    { heroId: 'windigo', star: 3, col: 1, row: 0 },
-    { heroId: 'bucheron', star: 3, col: 2, row: 0 },
-    { heroId: 'loup-garou', star: 3, col: 0, row: 0 },
-    { heroId: 'draveur', star: 3, col: 3, row: 0 },
-    { heroId: 'carcajou', star: 3, col: 1, row: 1 },
-    { heroId: 'windigo', star: 2, col: 2, row: 1 },
     { heroId: 'la-corriveau', star: 3, col: 1, row: 3 },
     { heroId: 'coureur-des-bois', star: 3, col: 2, row: 3 },
     { heroId: 'dame-blanche', star: 3, col: 0, row: 3 },
-    { heroId: 'dame-blanche', star: 2, col: 3, row: 2 },
-    { heroId: 'feu-follet', star: 3, col: 3, row: 3 },
+    { heroId: 'feu-follet', star: 2, col: 3, row: 3 },
+    { heroId: 'windigo', star: 2, col: 2, row: 1 },
   ],
   // 10 — the final veillée: a near-full ★3 board (10), crackable by a great comp
   [
