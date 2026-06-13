@@ -1,14 +1,26 @@
-import { JOYSTICK_DEADZONE, JOYSTICK_RADIUS_PX } from './config';
+import {
+  CURSOR_DEADZONE,
+  CURSOR_FULL_DIST,
+  JOYSTICK_DEADZONE,
+  JOYSTICK_RADIUS_PX,
+} from './config';
 
 /**
- * Floating virtual joystick: the base appears wherever the thumb lands
- * (anywhere on screen), the knob follows within JOYSTICK_RADIUS_PX.
+ * Movement input. On touch, a floating virtual joystick: the base appears
+ * wherever the thumb lands (anywhere on screen), the knob follows within
+ * JOYSTICK_RADIUS_PX. On desktop (a mouse moves), the joystick hides and the
+ * player walks toward the cursor — call `updateCursor` each frame.
  */
 export class Joystick {
   /** Direction * intensity, magnitude 0..1, +y = screen up. */
   readonly value = { x: 0, y: 0 };
   /** Set false while paused/in menus — taps are then ignored. */
   enabled = false;
+
+  /** Flips to true the first time a mouse is seen → cursor-follow mode. */
+  private mouseMode = false;
+  private mouseX = 0;
+  private mouseY = 0;
 
   private pointerId: number | null = null;
   private baseX = 0;
@@ -34,7 +46,40 @@ export class Joystick {
     this.knobEl.style.display = 'none';
   }
 
+  /**
+   * Desktop only: drive `value` toward the cursor's world position. No-op on
+   * touch or while disabled. Camera args map the screen-space cursor into the
+   * world (ortho camera centered at camX/camY spanning worldW × worldH).
+   */
+  updateCursor(
+    camX: number, camY: number, worldW: number, worldH: number,
+    playerX: number, playerY: number,
+  ): void {
+    if (!this.mouseMode) return;
+    if (!this.enabled) {
+      this.value.x = 0;
+      this.value.y = 0;
+      return;
+    }
+    const worldX = camX + (this.mouseX / window.innerWidth - 0.5) * worldW;
+    const worldY = camY + (0.5 - this.mouseY / window.innerHeight) * worldH;
+    const dx = worldX - playerX;
+    const dy = worldY - playerY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < CURSOR_DEADZONE) {
+      this.value.x = 0;
+      this.value.y = 0;
+      return;
+    }
+    const intensity = Math.min(
+      (dist - CURSOR_DEADZONE) / (CURSOR_FULL_DIST - CURSOR_DEADZONE), 1,
+    );
+    this.value.x = (dx / dist) * intensity;
+    this.value.y = (dy / dist) * intensity;
+  }
+
   private onDown(e: PointerEvent): void {
+    if (e.pointerType === 'mouse') return; // desktop steers with the cursor
     if (!this.enabled || this.pointerId !== null) return;
     this.pointerId = e.pointerId;
     this.baseX = e.clientX;
@@ -47,6 +92,15 @@ export class Joystick {
   }
 
   private onMove(e: PointerEvent): void {
+    if (e.pointerType === 'mouse') {
+      if (!this.mouseMode) {
+        this.mouseMode = true;
+        this.release(); // ditch any visible touch stick
+      }
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+      return;
+    }
     if (e.pointerId === this.pointerId) this.track(e);
   }
 

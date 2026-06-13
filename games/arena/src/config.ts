@@ -159,3 +159,6 @@ export const HIT_FLASH_TIME = 0.06; // s — white flash + scale punch on hit
 // input
 export const JOYSTICK_RADIUS_PX = 54; // matches the base circle in index.html
 export const JOYSTICK_DEADZONE = 0.18; // fraction of the radius
+// desktop: player walks toward the mouse cursor
+export const CURSOR_DEADZONE = 0.35; // world units — stop this close to the cursor
+export const CURSOR_FULL_DIST = 2.0; // world units — full speed beyond this

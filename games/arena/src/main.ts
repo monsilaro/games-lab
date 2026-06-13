@@ -254,7 +254,12 @@ function nearestEnemy(): { e: Enemy; d2: number } | null {
 
 // --- Per-frame simulation (only while playing) ----------------------------------------
 function updateWorld(dt: number): void {
-  // movement: joystick + decaying knockback, clamped inside the walls
+  // movement: joystick (touch) or cursor-follow (desktop) + decaying knockback,
+  // clamped inside the walls
+  joystick.updateCursor(
+    app.camera.position.x, app.camera.position.y,
+    app.worldWidth, C.WORLD_HEIGHT, player.x, player.y,
+  );
   const kbDecay = Math.exp(-C.KNOCKBACK_DECAY * dt);
   const boundX = C.MAP_WIDTH / 2 - C.PLAYER_RADIUS;
   const boundY = C.MAP_HEIGHT / 2 - C.PLAYER_RADIUS;
