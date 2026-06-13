@@ -6,6 +6,14 @@
 
 export type AbilityKind = 'strike' | 'volley' | 'hex' | 'ward';
 
+/** Short player-facing copy per ability, for the stats preview. */
+export const ABILITY_INFO: Record<AbilityKind, { label: string; desc: string }> = {
+  strike: { label: 'Frappe', desc: 'Gros coup sur la cible' },
+  volley: { label: 'Salve', desc: 'Touche plusieurs ennemis' },
+  hex: { label: 'Maléfice', desc: 'Dégâts + ralentit la cible' },
+  ward: { label: 'Bénédiction', desc: 'Soigne l’allié le plus faible' },
+};
+
 export interface Ability {
   kind: AbilityKind;
   /** Multiplier on the caster's atk (strike/volley/hex) or fraction of maxHp (ward). */

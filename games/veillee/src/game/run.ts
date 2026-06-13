@@ -9,6 +9,8 @@ import {
   LEVELS,
   COMBAT,
   IDENTITY_MOD,
+  TRAITS,
+  ABILITY_INFO,
   fieldCap,
   hpLoss,
   computeScore,
@@ -51,6 +53,8 @@ export function startGame(): void {
         refreshPreview();
         renderShopUi();
         renderSynergies();
+        if (selected && !state.units.includes(selected)) deselect(); // merged away
+        else if (selected) showStats(selected);
       }
     },
     onReroll: () => {
@@ -126,6 +130,7 @@ export function startGame(): void {
     phase = 'combat';
     combatEndTimer = COMBAT_END_PAUSE;
     cIid = 0;
+    deselect();
     hud.setShopVisible(false);
     hud.hideBanner();
     board.setPlacementVisible(false);
@@ -182,6 +187,7 @@ export function startGame(): void {
   function enterShop(withIncome: boolean): void {
     phase = 'shop';
     combat = null;
+    deselect();
     if (withIncome) grantIncome(state);
     rollShop(state);
     autoField(state); // a cleared level raised the cap — fill it from the bench
@@ -215,6 +221,36 @@ export function startGame(): void {
     hud.renderSynergies(activeSynergies(fielded));
   }
 
+  function showStats(unit: OwnedUnit): void {
+    const cfg = HERO_BY_ID.get(unit.heroId);
+    const base = UNITS[unit.heroId];
+    if (!cfg || !base) return;
+    const mult = Math.pow(STAR_SCALE, unit.star - 1);
+    const fielded = unit.placement.kind === 'cell';
+    const rows = activeSynergies(state.units.filter((u) => u.placement.kind === 'cell').map((u) => u.heroId));
+    const mod = fielded ? modifierFor(unit.heroId, rows) : IDENTITY_MOD;
+    const ab = ABILITY_INFO[base.ability.kind];
+    hud.showUnitStats({
+      name: cfg.name,
+      star: unit.star,
+      originLabel: TRAITS[cfg.origin].label,
+      roleLabel: TRAITS[cfg.role].label,
+      hp: Math.round(base.hp * mult * mod.hpMul),
+      atk: Math.round(base.atk * mult * mod.atkMul),
+      atkSpeed: mod.atkSpeedMul / base.atkInterval,
+      range: base.range + mod.rangeAdd,
+      abilityLabel: ab.label,
+      abilityDesc: ab.desc,
+      fielded,
+    });
+  }
+
+  function deselect(): void {
+    selected = null;
+    hud.hideUnitStats();
+    board.setPlacementActive(false);
+  }
+
   function gameOver(won: boolean): void {
     phase = 'over';
     combat = null;
@@ -243,6 +279,7 @@ export function startGame(): void {
   // ---------- drag placement (shop only) ----------
   const proj = new THREE.Vector3();
   let dragging: OwnedUnit | null = null;
+  let selected: OwnedUnit | null = null;
 
   function pickUnit(cx: number, cy: number): OwnedUnit | null {
     let best: OwnedUnit | null = null;
@@ -282,7 +319,15 @@ export function startGame(): void {
 
   app.renderer.domElement.addEventListener('pointerdown', (e: PointerEvent) => {
     if (phase !== 'shop') return;
-    dragging = pickUnit(e.clientX, e.clientY);
+    const picked = pickUnit(e.clientX, e.clientY);
+    dragging = picked;
+    if (picked) {
+      selected = picked;
+      showStats(picked);
+      board.setPlacementActive(true);
+    } else {
+      deselect(); // tap on empty space clears the preview
+    }
   });
   window.addEventListener('pointermove', (e: PointerEvent) => {
     if (!dragging) return;
@@ -299,6 +344,7 @@ export function startGame(): void {
     refreshPreview();
     renderHud();
     renderSynergies();
+    if (selected) showStats(selected); // placement/synergy may have changed
   });
 
   // ---------- main loop ----------

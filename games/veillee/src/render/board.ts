@@ -13,6 +13,8 @@ export interface Board {
   /** Snap a board-plane point to the nearest player cell or bench slot (null on the enemy side). */
   nearestSlot(p: { x: number; z: number }): Slot | null;
   setPlacementVisible(v: boolean): void;
+  /** Brighten the placement cells while a unit is selected/dragged. */
+  setPlacementActive(v: boolean): void;
 }
 
 const { cols, rows, cell, halfGap, benchGap } = BOARD;
@@ -68,6 +70,14 @@ export function buildBoard(scene: THREE.Scene): Board {
       m.rotation.x = -Math.PI / 2;
       m.position.set(colX(c), 0.02, playerZ(r));
       placement.add(m);
+      // crisp outline so the grid reads even when faint
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(cellGeo),
+        new THREE.LineBasicMaterial({ color: PALETTE.iceCyan, transparent: true, opacity: 0.22 }),
+      );
+      edge.rotation.x = -Math.PI / 2;
+      edge.position.set(colX(c), 0.025, playerZ(r));
+      placement.add(edge);
     }
   }
   const benchMat = new THREE.MeshBasicMaterial({ color: PALETTE.ember, transparent: true, opacity: 0.12 });
@@ -107,6 +117,10 @@ export function buildBoard(scene: THREE.Scene): Board {
     nearestSlot,
     setPlacementVisible: (v: boolean) => {
       placement.visible = v;
+    },
+    setPlacementActive: (v: boolean) => {
+      cellMat.opacity = v ? 0.26 : 0.08;
+      benchMat.opacity = v ? 0.28 : 0.12;
     },
   };
 }

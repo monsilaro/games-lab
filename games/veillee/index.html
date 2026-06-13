@@ -175,6 +175,67 @@
         color: rgba(202, 240, 248, 0.85);
       }
 
+      /* Unit stats preview (tap a unit) — top right */
+      #veillee-unit-stats {
+        position: fixed;
+        z-index: 11;
+        right: calc(env(safe-area-inset-right, 0px) + 8px);
+        top: calc(env(safe-area-inset-top, 0px) + 46px);
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        width: min(46vw, 220px);
+        padding: 9px 11px;
+        border-radius: 12px;
+        border: 1px solid rgba(202, 240, 248, 0.35);
+        background: rgba(28, 37, 65, 0.92);
+        pointer-events: none;
+      }
+      .veillee-us-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .veillee-us-name {
+        font-size: 15px;
+        font-weight: 800;
+      }
+      .veillee-us-star {
+        font-size: 12px;
+        color: #ffd166;
+      }
+      .veillee-us-traits {
+        font-size: 12px;
+        font-weight: 700;
+        color: #2ec4b6;
+      }
+      .veillee-us-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 1px 8px;
+        font-size: 12px;
+      }
+      .veillee-us-grid span:nth-child(odd) {
+        color: rgba(244, 244, 246, 0.6);
+      }
+      .veillee-us-grid span:nth-child(even) {
+        text-align: right;
+        font-weight: 700;
+      }
+      .veillee-us-abil {
+        font-size: 11px;
+        color: rgba(244, 244, 246, 0.85);
+        line-height: 1.2;
+      }
+      .veillee-us-abil strong {
+        color: #9d4edd;
+      }
+      .veillee-us-note {
+        font-size: 10px;
+        color: rgba(46, 196, 182, 0.9);
+      }
+
       #veillee-phase {
         position: fixed;
         z-index: 10;
@@ -371,6 +432,7 @@
       <span class="veillee-chip">⏱ <span id="veillee-stat-timer">0:00</span></span>
     </div>
     <div id="veillee-synergies"></div>
+    <div id="veillee-unit-stats"></div>
     <div id="veillee-phase"></div>
     <div id="veillee-banner"></div>
 

@@ -19,9 +19,25 @@ export interface HudStats {
   elapsed: number;
 }
 
+export interface UnitStatsInfo {
+  name: string;
+  star: number;
+  originLabel: string;
+  roleLabel: string;
+  hp: number;
+  atk: number;
+  atkSpeed: number; // attacks per second
+  range: number; // cells
+  abilityLabel: string;
+  abilityDesc: string;
+  fielded: boolean; // true → stats include active synergies
+}
+
 export interface Hud {
   setStats(s: HudStats): void;
   renderSynergies(rows: SynergyRow[]): void;
+  showUnitStats(u: UnitStatsInfo): void;
+  hideUnitStats(): void;
   renderShop(shop: (ShopOffer | null)[], gold: number): void;
   setShopVisible(v: boolean): void;
   setPhaseLabel(text: string | null): void;
@@ -66,6 +82,7 @@ export function createHud(h: HudHandlers): Hud {
   const banner = el<HTMLDivElement>('veillee-banner');
   const gameover = el<HTMLDivElement>('veillee-gameover');
   const synergies = el<HTMLDivElement>('veillee-synergies');
+  const unitStats = el<HTMLDivElement>('veillee-unit-stats');
 
   rerollBtn.addEventListener('click', h.onReroll);
   readyBtn.addEventListener('click', h.onReady);
@@ -99,6 +116,26 @@ export function createHud(h: HudHandlers): Hud {
           );
         })
         .join('');
+    },
+
+    showUnitStats(u) {
+      unitStats.innerHTML =
+        `<div class="veillee-us-head"><span class="veillee-us-name">${u.name}</span>` +
+        `<span class="veillee-us-star">${'★'.repeat(u.star)}</span></div>` +
+        `<div class="veillee-us-traits">${u.originLabel} · ${u.roleLabel}</div>` +
+        `<div class="veillee-us-grid">` +
+        `<span>PV</span><span>${u.hp}</span>` +
+        `<span>ATQ</span><span>${u.atk}</span>` +
+        `<span>Vitesse</span><span>${u.atkSpeed.toFixed(2)}/s</span>` +
+        `<span>Portée</span><span>${u.range.toFixed(1)}</span>` +
+        `</div>` +
+        `<div class="veillee-us-abil"><strong>${u.abilityLabel}</strong> — ${u.abilityDesc}</div>` +
+        (u.fielded ? `<div class="veillee-us-note">stats avec synergies</div>` : '');
+      unitStats.style.display = 'flex';
+    },
+
+    hideUnitStats() {
+      unitStats.style.display = 'none';
     },
 
     renderShop(shopOffers, gold) {
