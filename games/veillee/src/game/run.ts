@@ -341,7 +341,7 @@ export function startGame(): void {
 
   function pickUnit(cx: number, cy: number): OwnedUnit | null {
     let best: OwnedUnit | null = null;
-    let bestD = 72 * 72;
+    let bestD = 56 * 56;
     for (const u of state.units) {
       const v = views.get(u.iid);
       if (!v) continue;

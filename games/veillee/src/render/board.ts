@@ -61,6 +61,23 @@ export function buildBoard(scene: THREE.Scene): Board {
   seam.position.set(0, 0.05, 0);
   group.add(seam);
 
+  // Separate the bench from the battlefield: a raised wood rail between them,
+  // and a darker wood "shelf" the bench sits on, so the two zones read distinctly.
+  const railZ = (playerZ(rows - 1) + benchZ) / 2;
+  const rail = new THREE.Mesh(
+    new THREE.BoxGeometry(cols * cell + cell, 0.18, 0.12),
+    new THREE.MeshLambertMaterial({ color: PALETTE.woodDark, flatShading: true }),
+  );
+  rail.position.set(0, 0.09, railZ);
+  group.add(rail);
+
+  const shelf = new THREE.Mesh(
+    new THREE.BoxGeometry(cols * cell + cell * 0.6, 0.08, cell + 0.5),
+    new THREE.MeshLambertMaterial({ color: PALETTE.woodDark, flatShading: true }),
+  );
+  shelf.position.set(0, 0.0, benchZ);
+  group.add(shelf);
+
   // Placement markers (player cells + bench), hidden during combat.
   const placement = new THREE.Group();
   group.add(placement);

@@ -94,7 +94,7 @@ export const BOARD = {
   rows: 4,
   cell: 1.35, // world units per cell (x and z)
   halfGap: 0.85, // half the no-man's-land between the two front lines
-  benchGap: 0.55, // extra z between the player's back row and the bench
+  benchGap: 1.0, // extra z between the player's back row and the bench (separation)
   unitScale: 0.62, // shrink heroes vs the forge so 8 rows don't crowd
   hpBarHeight: 2.0, // world-Y of the HP bar above a unit
   hpBarWidth: 0.9,
