@@ -89,9 +89,9 @@ export const LEVELS: EnemyPlacement[][] = [
     { heroId: 'dame-blanche', star: 1, col: 0, row: 3 },
     { heroId: 'feu-follet', star: 1, col: 3, row: 3 },
   ],
-  // 10 — the final veillée: one ★3 boss over a mixed board (10), winnable by a good comp
+  // 10 — the final veillée: a ★2 board with a couple ★1s (10), winnable by a normal run
   [
-    { heroId: 'windigo', star: 3, col: 1, row: 0 },
+    { heroId: 'windigo', star: 2, col: 1, row: 0 },
     { heroId: 'bucheron', star: 2, col: 2, row: 0 },
     { heroId: 'loup-garou', star: 2, col: 0, row: 0 },
     { heroId: 'draveur', star: 1, col: 3, row: 0 },

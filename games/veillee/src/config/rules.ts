@@ -4,9 +4,9 @@
 // ---------------------------------------------------------------------------
 
 export const ECONOMY = {
-  startGold: 5,
+  startGold: 6,
   startHP: 20,
-  incomeBase: 6,
+  incomeBase: 7,
   interestPer: 10, // +1 gold per this much saved gold...
   interestMax: 5, // ...capped here
   rerollCost: 1,
