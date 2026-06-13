@@ -41,8 +41,13 @@
         touch-action: none;
         z-index: 0;
       }
+      button {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+      }
 
-      /* --- Forge name labels (projected from 3D each frame) ------------------ */
+      /* ===== Forge (?forge=1) ============================================= */
       #veillee-forge-labels {
         position: fixed;
         inset: 0;
@@ -56,7 +61,6 @@
         white-space: nowrap;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.02em;
         color: rgba(232, 237, 242, 0.78);
         text-shadow: 0 1px 4px rgba(10, 17, 40, 0.9);
         will-change: transform;
@@ -65,8 +69,6 @@
         color: #ff9f1c;
         text-shadow: 0 0 10px rgba(255, 159, 28, 0.8);
       }
-
-      /* --- Trait panel (tap a hero) ------------------------------------------ */
       #veillee-trait-panel {
         position: fixed;
         z-index: 12;
@@ -106,8 +108,149 @@
         color: rgba(244, 244, 246, 0.78);
       }
 
-      /* --- Placeholder landing (no ?forge param) ----------------------------- */
-      #veillee-placeholder {
+      /* ===== Game HUD ===================================================== */
+      #veillee-hud {
+        position: fixed;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 8px);
+        left: calc(env(safe-area-inset-left, 0px) + 8px);
+        right: calc(env(safe-area-inset-right, 0px) + 8px);
+        display: none; /* shown by the game HUD; stays hidden in forge mode */
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        pointer-events: none;
+      }
+      .veillee-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 10px;
+        border-radius: 11px;
+        background: rgba(28, 37, 65, 0.8);
+        font-size: 13px;
+        font-weight: 700;
+      }
+      #veillee-phase {
+        position: fixed;
+        z-index: 10;
+        top: 18%;
+        left: 0;
+        right: 0;
+        display: none;
+        text-align: center;
+        font-size: 26px;
+        font-weight: 800;
+        color: #caf0f8;
+        text-shadow: 0 0 16px rgba(202, 240, 248, 0.5);
+        pointer-events: none;
+      }
+
+      /* Win/lose banner */
+      #veillee-banner {
+        position: fixed;
+        z-index: 15;
+        top: 34%;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        text-align: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      #veillee-banner.veillee-banner--show {
+        opacity: 1;
+      }
+      #veillee-banner strong {
+        font-size: 40px;
+        font-weight: 800;
+        text-shadow: 0 0 22px rgba(46, 196, 182, 0.5);
+      }
+      #veillee-banner span {
+        font-size: 16px;
+        color: rgba(244, 244, 246, 0.85);
+      }
+
+      /* Shop bar */
+      #veillee-shop {
+        position: fixed;
+        z-index: 12;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px calc(env(safe-area-inset-right, 0px) + 10px)
+          calc(env(safe-area-inset-bottom, 0px) + 10px) calc(env(safe-area-inset-left, 0px) + 10px);
+        background: linear-gradient(to top, rgba(10, 17, 40, 0.92), rgba(10, 17, 40, 0.6));
+      }
+      #veillee-shop-offers {
+        display: flex;
+        gap: 8px;
+      }
+      .veillee-offer {
+        flex: 1;
+        min-height: 56px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 6px 4px;
+        border: 1px solid rgba(202, 240, 248, 0.3);
+        border-radius: 12px;
+        background: rgba(28, 37, 65, 0.9);
+      }
+      .veillee-offer:active {
+        transform: scale(0.96);
+      }
+      .veillee-offer--poor {
+        opacity: 0.45;
+      }
+      .veillee-offer--empty {
+        opacity: 0.18;
+        border-style: dashed;
+      }
+      .veillee-offer-name {
+        font-size: 13px;
+        font-weight: 700;
+        text-align: center;
+        line-height: 1.1;
+      }
+      .veillee-offer-cost {
+        font-size: 12px;
+        font-weight: 700;
+        color: #ffd166;
+      }
+      #veillee-shop-actions {
+        display: flex;
+        gap: 8px;
+      }
+      #veillee-shop-actions button {
+        flex: 1;
+        padding: 11px;
+        border-radius: 12px;
+        border: 2px solid rgba(202, 240, 248, 0.4);
+        background: rgba(28, 37, 65, 0.9);
+        font-size: 15px;
+        font-weight: 700;
+        color: #caf0f8;
+      }
+      #veillee-shop-actions button:disabled {
+        opacity: 0.4;
+      }
+      #veillee-ready-btn {
+        border-color: rgba(255, 159, 28, 0.7) !important;
+        color: #ff9f1c !important;
+      }
+
+      /* Game over */
+      #veillee-gameover {
         position: fixed;
         inset: 0;
         z-index: 20;
@@ -115,32 +258,44 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 18px;
+        gap: 16px;
         padding: 24px;
         text-align: center;
+        background: rgba(10, 17, 40, 0.82);
       }
-      #veillee-placeholder h1 {
-        font-size: 40px;
+      #veillee-gameover h1 {
+        font-size: 32px;
         font-weight: 800;
         text-shadow: 0 0 24px rgba(46, 196, 182, 0.35);
       }
-      #veillee-placeholder p {
+      .veillee-score {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: min(80vw, 320px);
         font-size: 16px;
-        color: rgba(244, 244, 246, 0.78);
-        max-width: 24ch;
       }
-      #veillee-placeholder a {
-        padding: 12px 22px;
+      .veillee-score > div {
+        display: flex;
+        justify-content: space-between;
+        color: rgba(244, 244, 246, 0.82);
+      }
+      .veillee-score-total {
+        margin-top: 6px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(202, 240, 248, 0.3);
+        font-size: 22px;
+        font-weight: 800;
+        color: #ff9f1c !important;
+      }
+      #veillee-replay-btn {
+        padding: 12px 26px;
         border: 2px solid rgba(255, 159, 28, 0.7);
         border-radius: 14px;
         background: rgba(255, 159, 28, 0.12);
         color: #ff9f1c;
-        font-size: 16px;
+        font-size: 17px;
         font-weight: 700;
-        text-decoration: none;
-      }
-      #veillee-placeholder a:active {
-        transform: scale(0.96);
       }
 
       #veillee-build-stamp {
@@ -155,14 +310,32 @@
     </style>
   </head>
   <body>
+    <!-- Forge mode -->
     <div id="veillee-forge-labels"></div>
     <div id="veillee-trait-panel"></div>
-    <div id="veillee-placeholder">
-      <h1>🕯️ Veillée</h1>
-      <p>Auto-battler du folklore québécois. La forge des héros est ouverte.</p>
-      <a href="?forge=1">Ouvrir la Forge →</a>
+
+    <!-- Game mode -->
+    <div id="veillee-hud">
+      <span class="veillee-chip">🗺 <span id="veillee-stat-level">Niv 1/10</span></span>
+      <span class="veillee-chip">⬢ <span id="veillee-stat-gold">0</span></span>
+      <span class="veillee-chip">♥ <span id="veillee-stat-hp">0</span></span>
+      <span class="veillee-chip">⚔ <span id="veillee-stat-field">0/3</span></span>
+      <span class="veillee-chip">⏱ <span id="veillee-stat-timer">0:00</span></span>
     </div>
+    <div id="veillee-phase"></div>
+    <div id="veillee-banner"></div>
+
+    <div id="veillee-shop">
+      <div id="veillee-shop-offers"></div>
+      <div id="veillee-shop-actions">
+        <button type="button" id="veillee-reroll-btn">Reroll (1)</button>
+        <button type="button" id="veillee-ready-btn">Combat →</button>
+      </div>
+    </div>
+
+    <div id="veillee-gameover"></div>
     <div id="veillee-build-stamp"></div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

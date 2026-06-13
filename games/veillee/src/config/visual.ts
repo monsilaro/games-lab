@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { AURORA } from '@games-lab/shared';
 
 // ---------------------------------------------------------------------------
-// Veillée tuning — single source of truth. No magic numbers live in the logic;
-// they all live here (scene / lighting / gabarits / forge layout). Hero *content*
-// (which parts + colors compose each hero) lives in src/forge/heroes.ts.
+// Visual / scene tuning — single source of truth for the LOOK (palette, light
+// rig, camera framing, gabarits, board layout). Game-rules data lives in the
+// sibling config files (units / levels / rules); all re-exported via index.ts.
 // ---------------------------------------------------------------------------
 
 // The shared aurora night palette + a few warm Veillée-specific tones.
@@ -17,7 +17,7 @@ export const PALETTE = {
 
 export type Build = 'sm' | 'md' | 'lg' | 'float';
 
-// Per-gabarit proportions. `baseY` lifts floaters off the pedestal; `hover` is
+// Per-gabarit proportions. `baseY` lifts floaters off the ground; `hover` is
 // the idle vertical drift amplitude (0 = grounded).
 export const GABARITS: Record<Build, { scale: number; baseY: number; hover: number }> = {
   sm: { scale: 0.78, baseY: 0, hover: 0 },
@@ -26,26 +26,41 @@ export const GABARITS: Record<Build, { scale: number; baseY: number; hover: numb
   float: { scale: 0.95, baseY: 0.7, hover: 0.12 },
 };
 
-// Diorama camera + clip. We reuse the shared ortho camera and tilt it ~30° here;
-// `cameraFar` overrides the shared default (30) because the tilted diorama is deeper.
-export const SCENE = {
+// A camera framing: where the tilted ortho camera sits + how far it clips.
+export interface Framing {
+  worldHeight: number;
+  cameraPos: THREE.Vector3;
+  cameraLookAt: THREE.Vector3;
+  cameraFar: number;
+}
+
+// Forge gallery framing (Phase 1).
+export const SCENE: Framing = {
   worldHeight: 16,
   cameraPos: new THREE.Vector3(0, 9, 14),
   cameraLookAt: new THREE.Vector3(0, 0.6, -0.5),
   cameraFar: 80,
-} as const;
+};
+
+// Battle board framing (Phase 2) — pulled back/up for the deeper two-grid diorama.
+export const BOARD_VIEW: Framing = {
+  worldHeight: 18,
+  cameraPos: new THREE.Vector3(0, 12, 16),
+  cameraLookAt: new THREE.Vector3(0, 0, 0.8),
+  cameraFar: 90,
+};
 
 // The real game light rig: cold moon (directional) + faint blue fill (ambient)
 // + warm low lantern (point). Chaud/froid contrast is what gives the faceted depth.
 export const LIGHTS = {
   moon: { color: 0xbcd2ff, intensity: 1.15, position: new THREE.Vector3(-7, 13, 5) },
-  ambient: { color: 0x2b3a63, intensity: 0.55 },
+  ambient: { color: 0x2b3a63, intensity: 0.6 },
   lantern: {
     color: PALETTE.lantern,
-    intensity: 7,
-    distance: 22,
-    decay: 1.6,
-    position: new THREE.Vector3(3, 1.4, 5),
+    intensity: 8,
+    distance: 26,
+    decay: 1.5,
+    position: new THREE.Vector3(3, 1.6, 6),
   },
 } as const;
 
@@ -67,4 +82,17 @@ export const FORGE = {
   labelHeight: 2.1, // world-Y of the name label anchor above each pedestal
   pickHeight: 0.9, // world-Y used as the tap target for each hero
   pickRadiusPx: 64, // tap tolerance in screen px
+} as const;
+
+// Battle board geometry. Player 4x4 sits near the camera (+z), enemy 4x4 far
+// (-z), with a gap "front line" between; a bench row sits in front of the player.
+export const BOARD = {
+  cols: 4,
+  rows: 4,
+  cell: 1.35, // world units per cell (x and z)
+  halfGap: 0.95, // half the no-man's-land between the two front lines
+  benchGap: 0.8, // extra z between the player's back row and the bench
+  unitScale: 0.62, // shrink heroes vs the forge so 8 rows don't crowd
+  hpBarHeight: 2.0, // world-Y of the HP bar above a unit
+  hpBarWidth: 0.9,
 } as const;

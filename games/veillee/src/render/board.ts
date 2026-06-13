@@ -1,0 +1,112 @@
+import * as THREE from 'three';
+import { PALETTE, BOARD, ECONOMY } from '../config';
+import type { Team } from '../combat/types';
+
+export type Slot = { kind: 'cell'; col: number; row: number } | { kind: 'bench'; i: number };
+
+export interface Board {
+  group: THREE.Group;
+  plane: THREE.Plane; // y=0, for drag raycasts
+  cellToWorld(side: Team, col: number, row: number): { x: number; z: number };
+  benchToWorld(i: number): { x: number; z: number };
+  slotToWorld(slot: Slot): { x: number; z: number };
+  /** Snap a board-plane point to the nearest player cell or bench slot (null on the enemy side). */
+  nearestSlot(p: { x: number; z: number }): Slot | null;
+  setPlacementVisible(v: boolean): void;
+}
+
+const { cols, rows, cell, halfGap, benchGap } = BOARD;
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+
+const colX = (col: number): number => (col - (cols - 1) / 2) * cell;
+const playerZ = (row: number): number => halfGap + (row + 0.5) * cell; // row 0 = front line
+const enemyZ = (row: number): number => -(halfGap + (row + 0.5) * cell);
+const benchZ = halfGap + rows * cell + benchGap;
+
+export function buildBoard(scene: THREE.Scene): Board {
+  const group = new THREE.Group();
+  scene.add(group);
+
+  // Floating wood slab + snow top spanning both grids and the bench.
+  const minZ = enemyZ(rows - 1) - cell * 0.8;
+  const maxZ = benchZ + cell * 0.7;
+  const midZ = (minZ + maxZ) / 2;
+  const w = cols * cell + cell;
+  const d = maxZ - minZ;
+
+  const wood = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 0.5, d),
+    new THREE.MeshLambertMaterial({ color: PALETTE.wood, flatShading: true }),
+  );
+  wood.position.set(0, -0.3, midZ);
+  group.add(wood);
+
+  const snow = new THREE.Mesh(
+    new THREE.BoxGeometry(w - 0.2, 0.12, d - 0.2),
+    new THREE.MeshLambertMaterial({ color: PALETTE.snow, flatShading: true }),
+  );
+  snow.position.set(0, -0.04, midZ);
+  group.add(snow);
+
+  // A faint front-line seam at the gap.
+  const seam = new THREE.Mesh(
+    new THREE.PlaneGeometry(w - 0.4, 0.06),
+    new THREE.MeshBasicMaterial({ color: PALETTE.iceCyan, transparent: true, opacity: 0.25 }),
+  );
+  seam.rotation.x = -Math.PI / 2;
+  seam.position.set(0, 0.03, 0);
+  group.add(seam);
+
+  // Placement markers (player cells + bench), hidden during combat.
+  const placement = new THREE.Group();
+  group.add(placement);
+  const cellGeo = new THREE.PlaneGeometry(cell * 0.86, cell * 0.86);
+  const cellMat = new THREE.MeshBasicMaterial({ color: PALETTE.iceCyan, transparent: true, opacity: 0.08 });
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const m = new THREE.Mesh(cellGeo, cellMat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(colX(c), 0.02, playerZ(r));
+      placement.add(m);
+    }
+  }
+  const benchMat = new THREE.MeshBasicMaterial({ color: PALETTE.ember, transparent: true, opacity: 0.12 });
+  for (let i = 0; i < ECONOMY.benchSize; i++) {
+    const m = new THREE.Mesh(cellGeo, benchMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(colX(i), 0.02, benchZ);
+    placement.add(m);
+  }
+
+  const cellToWorld = (side: Team, col: number, row: number): { x: number; z: number } => ({
+    x: colX(col),
+    z: side === 'player' ? playerZ(row) : enemyZ(row),
+  });
+  const benchToWorld = (i: number): { x: number; z: number } => ({ x: colX(i), z: benchZ });
+  const slotToWorld = (slot: Slot): { x: number; z: number } =>
+    slot.kind === 'cell' ? cellToWorld('player', slot.col, slot.row) : benchToWorld(slot.i);
+
+  const nearestSlot = (p: { x: number; z: number }): Slot | null => {
+    if (p.z <= 0) return null; // enemy half / no-man's-land
+    const col = clamp(Math.round(p.x / cell + (cols - 1) / 2), 0, cols - 1);
+    const row = clamp(Math.round((p.z - halfGap) / cell - 0.5), 0, rows - 1);
+    const cc = cellToWorld('player', col, row);
+    const cellD = Math.hypot(p.x - cc.x, p.z - cc.z);
+    const bi = clamp(Math.round(p.x / cell + (cols - 1) / 2), 0, ECONOMY.benchSize - 1);
+    const bc = benchToWorld(bi);
+    const benchD = Math.hypot(p.x - bc.x, p.z - bc.z);
+    return cellD <= benchD ? { kind: 'cell', col, row } : { kind: 'bench', i: bi };
+  };
+
+  return {
+    group,
+    plane: new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    cellToWorld,
+    benchToWorld,
+    slotToWorld,
+    nearestSlot,
+    setPlacementVisible: (v: boolean) => {
+      placement.visible = v;
+    },
+  };
+}

@@ -217,3 +217,6 @@ export const HEROES: HeroConfig[] = [
     accessories: ['ceinture'],
   },
 ];
+
+/** Lookup by hero id — used by combat to build a unit's visual from its id. */
+export const HERO_BY_ID: Map<string, HeroConfig> = new Map(HEROES.map((h) => [h.id, h]));
