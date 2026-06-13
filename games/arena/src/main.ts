@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import { createOrthoApp, startGameLoop } from '@games-lab/shared';
+import {
+  createOrthoApp,
+  startGameLoop,
+  submitScore,
+  showLeaderboard,
+  getStoredPlayerName,
+  promptPlayerName,
+} from '@games-lab/shared';
 import * as C from './config';
 import { basePlayerStats, type PlayerStats } from './config';
 import { FollowCamera } from './camera';
@@ -80,6 +87,29 @@ function xpNeeded(): number {
   return C.XP_BASE + (level - 1) * C.XP_GROWTH;
 }
 
+// --- Leaderboard (shared games-lab service) -----------------------------------
+const LEADERBOARD_GAME = 'arena';
+const leaderboardBtn = document.getElementById('arena-leaderboard-btn') as HTMLButtonElement;
+
+// The button is the only interactive element on the game-over screen. Stopping
+// propagation keeps the tap from also firing the window "tap to play again".
+leaderboardBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+leaderboardBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  showLeaderboard(LEADERBOARD_GAME, {
+    title: 'Arena — Top',
+    playerName: getStoredPlayerName(),
+    highlightScore: kills,
+  });
+});
+
+// Submit the run's kills: ask for a name once (remembered after), fire-and-forget.
+async function submitArenaScore(finalScore: number): Promise<void> {
+  const name = await promptPlayerName();
+  if (!name) return;
+  await submitScore(LEADERBOARD_GAME, name, finalScore, { build: __BUILD_INFO__ });
+}
+
 function startGame(): void {
   stats = basePlayerStats();
   level = 1;
@@ -95,6 +125,7 @@ function startGame(): void {
   cam.snapTo(0, 0);
   hud.hideOverlay();
   hud.hideUpgradeCards();
+  leaderboardBtn.style.display = 'none';
   hud.setHudVisible(true);
   hud.setHp(stats.hp, stats.maxHp);
   hud.setXp(0, xpNeeded(), level);
@@ -116,6 +147,10 @@ function gameOver(): void {
     `Wave ${waves.wave} · ${kills} kills`,
     'Tap to play again',
   ]);
+
+  // Offer the leaderboard, and submit non-zero runs (asks the name once).
+  leaderboardBtn.style.display = 'block';
+  if (kills > 0) void submitArenaScore(kills);
 }
 
 function enterLevelUp(): void {

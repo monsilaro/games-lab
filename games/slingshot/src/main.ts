@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import Matter from 'matter-js';
-import { createOrthoApp, startGameLoop } from '@games-lab/shared';
+import {
+  createOrthoApp,
+  startGameLoop,
+  submitScore,
+  showLeaderboard,
+  getStoredPlayerName,
+  promptPlayerName,
+} from '@games-lab/shared';
 import * as C from './config';
 import * as physics from './physics';
 import * as blocks from './blocks';
@@ -103,11 +110,40 @@ function startLevel(lv: number): void {
   setState('settling');
 }
 
+// --- Leaderboard (shared games-lab service) -----------------------------------
+const LEADERBOARD_GAME = 'slingshot';
+const leaderboardBtn = document.getElementById('slingshot-leaderboard-btn') as HTMLButtonElement;
+
+// The button is the only interactive element on the game-over screen. Stop
+// propagation (like the next-shot button) so the tap doesn't fire the window
+// "tap to play again".
+leaderboardBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+});
+leaderboardBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  showLeaderboard(LEADERBOARD_GAME, {
+    title: 'Slingshot — Top',
+    playerName: getStoredPlayerName(),
+    highlightScore: score,
+  });
+});
+
+// Submit the run's cumulative score: ask for a name once (remembered after),
+// fire-and-forget. Only on game over — level clears continue the same run.
+async function submitSlingshotScore(finalScore: number): Promise<void> {
+  const name = await promptPlayerName();
+  if (!name) return;
+  await submitScore(LEADERBOARD_GAME, name, finalScore, { build: __BUILD_INFO__ });
+}
+
 function startGame(): void {
   score = 0;
   level = 1;
   effects.reset();
   hud.hideOverlay();
+  leaderboardBtn.style.display = 'none';
   hud.setHudVisible(true);
   startLevel(1);
 }
@@ -118,6 +154,10 @@ function gameOver(): void {
   hud.setHudVisible(false);
   hud.showNextButton(false);
   hud.showOverlay('Game over', [`Level ${level} · score ${score}`, 'Tap to play again']);
+
+  // Offer the leaderboard, and submit non-zero runs (asks the name once).
+  leaderboardBtn.style.display = 'block';
+  if (score > 0) void submitSlingshotScore(score);
 }
 
 function fire(x: number, y: number, vx: number, vy: number): void {

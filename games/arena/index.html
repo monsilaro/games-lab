@@ -266,6 +266,28 @@
         color: rgba(244, 244, 246, 0.4);
         pointer-events: none;
       }
+      /* Leaderboard button: only interactive element on the game-over screen;
+         z-index above the overlay (20), stops the tap from restarting. */
+      #arena-leaderboard-btn {
+        position: fixed;
+        z-index: 30;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+        display: none;
+        pointer-events: auto;
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        padding: 12px 22px;
+        border-radius: 10px;
+        font-family: inherit;
+        font-size: 17px;
+        font-weight: 800;
+        color: #0a1128;
+        background: #ffd166;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+      }
     </style>
   </head>
   <body>
@@ -288,6 +310,7 @@
       <div id="arena-upgrade-cards"></div>
     </div>
     <div id="arena-game-overlay"></div>
+    <button id="arena-leaderboard-btn" type="button">🏆 Classement</button>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
