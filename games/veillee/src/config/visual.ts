@@ -42,11 +42,14 @@ export const SCENE: Framing = {
   cameraFar: 80,
 };
 
-// Battle board framing (Phase 2) — pulled back/up for the deeper two-grid diorama.
+// Battle board framing (Phase 2). worldHeight is tuned near the width-fit floor so
+// the board fills the phone (4 cols ≈ 6.8 world units wide → worldHeight·aspect must
+// cover it); lookAt is pushed toward the player so the board sits high and the bench
+// clears the shop bar at the bottom.
 export const BOARD_VIEW: Framing = {
-  worldHeight: 18,
-  cameraPos: new THREE.Vector3(0, 12, 16),
-  cameraLookAt: new THREE.Vector3(0, 0, 0.8),
+  worldHeight: 15,
+  cameraPos: new THREE.Vector3(0, 11, 15.5),
+  cameraLookAt: new THREE.Vector3(0, 0, 1.4),
   cameraFar: 90,
 };
 
@@ -90,8 +93,8 @@ export const BOARD = {
   cols: 4,
   rows: 4,
   cell: 1.35, // world units per cell (x and z)
-  halfGap: 0.95, // half the no-man's-land between the two front lines
-  benchGap: 0.8, // extra z between the player's back row and the bench
+  halfGap: 0.85, // half the no-man's-land between the two front lines
+  benchGap: 0.55, // extra z between the player's back row and the bench
   unitScale: 0.62, // shrink heroes vs the forge so 8 rows don't crowd
   hpBarHeight: 2.0, // world-Y of the HP bar above a unit
   hpBarWidth: 0.9,
