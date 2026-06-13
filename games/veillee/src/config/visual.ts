@@ -47,7 +47,7 @@ export const SCENE: Framing = {
 // cover it); lookAt is pushed toward the player so the board sits high and the bench
 // clears the shop bar at the bottom.
 export const BOARD_VIEW: Framing = {
-  worldHeight: 15,
+  worldHeight: 14,
   cameraPos: new THREE.Vector3(0, 11, 15.5),
   cameraLookAt: new THREE.Vector3(0, 0, 1.4),
   cameraFar: 90,
@@ -94,7 +94,7 @@ export const BOARD = {
   rows: 4,
   cell: 1.35, // world units per cell (x and z)
   halfGap: 0.85, // half the no-man's-land between the two front lines
-  benchGap: 1.0, // extra z between the player's back row and the bench (separation)
+  benchGap: 1.2, // extra z between the player's back row and the bench (separation)
   unitScale: 0.62, // shrink heroes vs the forge so 8 rows don't crowd
   hpBarHeight: 2.0, // world-Y of the HP bar above a unit
   hpBarWidth: 0.9,

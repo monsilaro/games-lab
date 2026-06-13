@@ -27,6 +27,30 @@ const playerZ = (row: number): number => halfGap + (row + 0.5) * cell; // row 0 
 const enemyZ = (row: number): number => -(halfGap + (row + 0.5) * cell);
 const benchZ = halfGap + rows * cell + benchGap;
 
+// Bench is its own row with its own (tighter) spacing, so it can hold more slots
+// than the board has columns without spilling past the board's width.
+const benchN = ECONOMY.benchSize;
+const benchSpacing = (cols * cell) / benchN;
+const benchX = (i: number): number => (i - (benchN - 1) / 2) * benchSpacing;
+
+function scatterStars(parent: THREE.Object3D): void {
+  const N = 160;
+  const pos = new Float32Array(N * 3);
+  let seed = 9157;
+  const rnd = (): number => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = (rnd() - 0.5) * 48;
+    pos[i * 3 + 1] = rnd() * 22 - 1;
+    pos[i * 3 + 2] = -22 - rnd() * 16;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  parent.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: PALETTE.iceCyan, size: 0.14, sizeAttenuation: true })));
+}
+
 export function buildBoard(scene: THREE.Scene): Board {
   const group = new THREE.Group();
   scene.add(group);
@@ -51,6 +75,10 @@ export function buildBoard(scene: THREE.Scene): Board {
   );
   snow.position.set(0, -0.04, midZ);
   group.add(snow);
+
+  // Night atmosphere — fills the screen above/below the board so the empty sky
+  // reads as a starfield, not a blank border.
+  scatterStars(group);
 
   // A faint front-line seam at the gap.
   const seam = new THREE.Mesh(
@@ -105,10 +133,11 @@ export function buildBoard(scene: THREE.Scene): Board {
     }
   }
   const benchMat = new THREE.MeshBasicMaterial({ color: PALETTE.ember, transparent: true, opacity: 0.12 });
-  for (let i = 0; i < ECONOMY.benchSize; i++) {
-    const m = new THREE.Mesh(cellGeo, benchMat);
+  const benchMarkerGeo = new THREE.PlaneGeometry(benchSpacing * 0.84, cell * 0.7);
+  for (let i = 0; i < benchN; i++) {
+    const m = new THREE.Mesh(benchMarkerGeo, benchMat);
     m.rotation.x = -Math.PI / 2;
-    m.position.set(colX(i), 0.06, benchZ);
+    m.position.set(benchX(i), 0.06, benchZ);
     placement.add(m);
   }
 
@@ -116,7 +145,7 @@ export function buildBoard(scene: THREE.Scene): Board {
     x: colX(col),
     z: side === 'player' ? playerZ(row) : enemyZ(row),
   });
-  const benchToWorld = (i: number): { x: number; z: number } => ({ x: colX(i), z: benchZ });
+  const benchToWorld = (i: number): { x: number; z: number } => ({ x: benchX(i), z: benchZ });
   const slotToWorld = (slot: Slot): { x: number; z: number } =>
     slot.kind === 'cell' ? cellToWorld('player', slot.col, slot.row) : benchToWorld(slot.i);
 
@@ -126,7 +155,7 @@ export function buildBoard(scene: THREE.Scene): Board {
     const row = clamp(Math.round((p.z - halfGap) / cell - 0.5), 0, rows - 1);
     const cc = cellToWorld('player', col, row);
     const cellD = Math.hypot(p.x - cc.x, p.z - cc.z);
-    const bi = clamp(Math.round(p.x / cell + (cols - 1) / 2), 0, ECONOMY.benchSize - 1);
+    const bi = clamp(Math.round(p.x / benchSpacing + (benchN - 1) / 2), 0, benchN - 1);
     const bc = benchToWorld(bi);
     const benchD = Math.hypot(p.x - bc.x, p.z - bc.z);
     return cellD <= benchD ? { kind: 'cell', col, row } : { kind: 'bench', i: bi };

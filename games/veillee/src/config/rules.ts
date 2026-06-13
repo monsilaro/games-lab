@@ -11,7 +11,7 @@ export const ECONOMY = {
   interestMax: 5, // ...capped here
   rerollCost: 1,
   shopSize: 3,
-  benchSize: 4,
+  benchSize: 6,
   starMax: 3 as const,
 };
 
