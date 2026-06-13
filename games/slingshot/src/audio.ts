@@ -11,6 +11,12 @@ import * as C from './config';
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
+let muted = false;
+
+/** Mute/unmute all SFX (the graph stays up; calls just early-out). */
+export function setMuted(m: boolean): void {
+  muted = m;
+}
 
 /** Lazily build/resume the audio graph. Safe to call on every gesture. */
 export function unlock(): void {
@@ -84,14 +90,14 @@ function marimba(f: number, t0: number, peak: number): void {
 
 // --- public SFX -----------------------------------------------------------------
 export function launch(): void {
-  if (!ctx) return;
+  if (muted || !ctx) return;
   const t = now();
   noise(t, 0.18, 0.32, 2600); // paper flick
   tone('sine', 200, 110, t, 0.2, 0.32);
 }
 
 export function thud(rel: number): void {
-  if (!ctx) return;
+  if (muted || !ctx) return;
   const t = now();
   const v = Math.min(1, rel / 12);
   tone('sine', 130, 60, t, 0.16, 0.35 + v * 0.3); // felt thump
@@ -99,7 +105,7 @@ export function thud(rel: number): void {
 }
 
 export function shatter(material: C.BlockMaterial): void {
-  if (!ctx) return;
+  if (muted || !ctx) return;
   const t = now();
   if (material === 'ice') {
     noise(t, 0.18, 0.22, 5200, true); // tissue crinkle
@@ -114,14 +120,14 @@ export function shatter(material: C.BlockMaterial): void {
 }
 
 export function targetChime(combo: number): void {
-  if (!ctx) return;
+  if (muted || !ctx) return;
   const steps = [523, 587, 659, 784, 880, 988, 1175]; // pentatonic, climbs with the combo
   const f = steps[Math.min(combo, steps.length) - 1] ?? 523;
   marimba(f, now(), 0.34);
 }
 
 export function boom(): void {
-  if (!ctx) return;
+  if (muted || !ctx) return;
   const t = now();
   tone('sine', 110, 38, t, 0.4, 0.7); // soft paper "pomf", not a blast
   tone('triangle', 150, 60, t, 0.22, 0.22);
@@ -129,14 +135,14 @@ export function boom(): void {
 }
 
 export function levelClear(stars: number): void {
-  if (!ctx) return;
+  if (muted || !ctx) return;
   const t = now();
   const notes = [523, 659, 784, 1047, 1319];
   for (let i = 0; i <= stars + 1; i++) marimba(notes[i] ?? 1047, t + i * 0.12, 0.3);
 }
 
 export function uiTap(): void {
-  if (!ctx) return;
+  if (muted || !ctx) return;
   marimba(740, now(), 0.18);
 }
 

@@ -145,6 +145,7 @@ interface Bit {
   vr: number;
   life: number;
   max: number;
+  dust: boolean; // pale low-gravity paper-dust puff vs a confetti bit
 }
 const bits: Bit[] = [];
 const quadGeo = new THREE.PlaneGeometry(2, 1.4);
@@ -156,13 +157,69 @@ const triGeo = (() => {
   s.closePath();
   return new THREE.ShapeGeometry(s);
 })();
+let dustTimer = 0;
 
-// --- screen shake (unchanged) ----------------------------------------------------
+function freeBit(): Bit | null {
+  for (const b of bits) if (b.life <= 0) return b;
+  return null;
+}
+
+// --- grain overlay (subtle paper tooth, multiplied over the whole scene) ----------
+const grainCanvas = document.createElement('canvas');
+grainCanvas.width = grainCanvas.height = 160;
+{
+  const gc = grainCanvas.getContext('2d')!;
+  const img = gc.createImageData(160, 160);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 232 + Math.floor(Math.random() * 24); // near-white so multiply stays subtle
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  gc.putImageData(img, 0, 0);
+}
+const grainTex = new THREE.CanvasTexture(grainCanvas);
+grainTex.wrapS = grainTex.wrapT = THREE.RepeatWrapping;
+const grainMat = new THREE.MeshBasicMaterial({
+  map: grainTex,
+  transparent: true,
+  blending: THREE.MultiplyBlending,
+  depthWrite: false,
+});
+const grain = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), grainMat);
+grain.position.z = 0.6;
+
+/** Settings gate for the paper-grain overlay. */
+export function setGrainEnabled(enabled: boolean): void {
+  grain.visible = enabled;
+}
+
+// --- TNT flash (brief white disc that scales up + fades) --------------------------
+const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false });
+const flashMesh = new THREE.Mesh(new THREE.CircleGeometry(1, 28), flashMat);
+flashMesh.position.z = 0.5;
+flashMesh.visible = false;
+let flashLife = 0;
+const FLASH_MAX = 0.32;
+
+export function flash(x: number, y: number): void {
+  flashMesh.position.set(x, y, 0.5);
+  flashLife = FLASH_MAX;
+  flashMesh.visible = true;
+}
+
+// --- screen shake ----------------------------------------------------------------
 let shakeTime = 0;
+let shakeEnabled = true;
 export const shakeOffset = { x: 0, y: 0 };
+
+/** Settings gate: when off, shake() is a no-op (offset stays zero). */
+export function setShakeEnabled(enabled: boolean): void {
+  shakeEnabled = enabled;
+}
 
 export function init(scene: THREE.Scene): void {
   scene.add(sky, hillBack, hillMid, groundFill, groundEdge, sun, ...cloudMeshes);
+  scene.add(grain, flashMesh);
 
   // night stars: a wide field above the ground, each twinkling on its own phase
   const positions = new Float32Array(C.STAR_COUNT * 3);
@@ -193,7 +250,7 @@ export function init(scene: THREE.Scene): void {
     mesh.visible = false;
     mesh.position.z = 0.4;
     scene.add(mesh);
-    bits.push({ mesh, mat, vx: 0, vy: 0, vr: 0, life: 0, max: 1 });
+    bits.push({ mesh, mat, vx: 0, vy: 0, vr: 0, life: 0, max: 1, dust: false });
   }
 
   inited = true;
@@ -234,6 +291,11 @@ function applyView(): void {
   sky.position.set(cx, cy, -3);
   // sun parked ~17% from the left, ~20% down from the top
   sun.position.set(cx - halfW * 0.66, cy + halfH * 0.6, -1);
+  // grain covers the whole view; tile the noise small for fine tooth
+  grain.scale.set(2 * halfW * 1.1, 2 * halfH * 1.1, 1);
+  grain.position.set(cx, cy, 0.6);
+  grainTex.repeat.set((2 * halfW) / 6, (2 * halfH) / 6);
+  grainTex.needsUpdate = true;
 }
 
 export function burst(x: number, y: number, _color: number, count: number): void {
@@ -247,6 +309,7 @@ export function burst(x: number, y: number, _color: number, count: number): void
     b.vx = Math.cos(angle) * speed;
     b.vy = Math.sin(angle) * speed + 2.5; // upward bias — bits pop then fall
     b.vr = (Math.random() - 0.5) * 14;
+    b.dust = false;
     b.max = C.CONFETTI_LIFE * (0.7 + Math.random() * 0.5);
     b.life = b.max;
     const size = C.CONFETTI_SIZE * (0.7 + Math.random() * 0.7);
@@ -261,12 +324,30 @@ export function burst(x: number, y: number, _color: number, count: number): void
 }
 
 export function shake(): void {
+  if (!shakeEnabled) return;
   shakeTime = C.SHAKE_DURATION;
 }
 
-/** The ember trail is gone in papercraft — kept as a no-op so main can call it. */
-export function stampTrail(_dt: number, _x: number, _y: number): void {
-  // intentionally empty
+/** Faint pale paper-dust puff trailing the flying ball, on a fixed interval. */
+export function stampTrail(dt: number, x: number, y: number): void {
+  dustTimer -= dt;
+  if (dustTimer > 0) return;
+  dustTimer = 0.05;
+  const b = freeBit();
+  if (!b) return;
+  b.dust = true;
+  b.vx = (Math.random() - 0.5) * 0.6;
+  b.vy = 0.3 + Math.random() * 0.4;
+  b.vr = (Math.random() - 0.5) * 2;
+  b.max = 0.4 + Math.random() * 0.2;
+  b.life = b.max;
+  const size = 0.06 + Math.random() * 0.05;
+  b.mat.color.set(theme.cloud);
+  b.mesh.geometry = quadGeo;
+  b.mesh.scale.set(size, size, 1);
+  b.mesh.rotation.z = Math.random() * Math.PI * 2;
+  b.mesh.position.set(x, y, 0.4);
+  b.mesh.visible = true;
 }
 
 export function update(dt: number): void {
@@ -292,18 +373,29 @@ export function update(dt: number): void {
       b.mesh.visible = false;
       continue;
     }
-    b.vy -= C.CONFETTI_GRAVITY * dt;
+    b.vy -= (b.dust ? C.CONFETTI_GRAVITY * 0.12 : C.CONFETTI_GRAVITY) * dt;
     b.mesh.position.x += b.vx * dt;
     b.mesh.position.y += b.vy * dt;
-    // soft paper bounce on the ground
-    if (b.mesh.position.y < C.GROUND_Y + 0.05 && b.vy < 0) {
+    // confetti gets a soft ground bounce; dust just drifts and fades
+    if (!b.dust && b.mesh.position.y < C.GROUND_Y + 0.05 && b.vy < 0) {
       b.mesh.position.y = C.GROUND_Y + 0.05;
       b.vy *= -0.35;
       b.vx *= 0.6;
       b.vr *= 0.6;
     }
     b.mesh.rotation.z += b.vr * dt;
-    b.mat.opacity = Math.min(1, (b.life / b.max) * 1.4);
+    b.mat.opacity = b.dust
+      ? Math.min(0.45, (b.life / b.max) * 0.6)
+      : Math.min(1, (b.life / b.max) * 1.4);
+  }
+
+  if (flashLife > 0) {
+    flashLife = Math.max(0, flashLife - dt);
+    const k = flashLife / FLASH_MAX;
+    const s = 1 + (1 - k) * 3.5;
+    flashMesh.scale.set(s, s, 1);
+    flashMat.opacity = k * 0.8;
+    if (flashLife <= 0) flashMesh.visible = false;
   }
 
   if (shakeTime > 0) {
@@ -323,4 +415,6 @@ export function reset(): void {
     b.mesh.visible = false;
   }
   shakeTime = 0;
+  flashLife = 0;
+  flashMesh.visible = false;
 }

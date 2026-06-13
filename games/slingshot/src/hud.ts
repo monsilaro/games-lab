@@ -23,8 +23,8 @@ export function setHudVisible(visible: boolean): void {
   hudBox.style.display = visible ? 'flex' : 'none';
 }
 
-export function setLevel(level: number): void {
-  levelLabel.textContent = `Level ${level}`;
+export function setLevel(label: string): void {
+  levelLabel.textContent = label;
 }
 
 export function setScore(score: number): void {

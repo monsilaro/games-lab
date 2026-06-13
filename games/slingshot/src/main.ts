@@ -16,8 +16,11 @@ import type { Target } from './targets';
 import * as effects from './effects';
 import * as audio from './audio';
 import * as hud from './hud';
-import { generateLevel } from './levelgen';
+import { generateLevel, type BlockDesc, type TargetDesc } from './levelgen';
 import { Slingshot } from './slingshot';
+import * as menu from './menu';
+import * as settings from './settings';
+import * as story from './story';
 
 declare const __BUILD_INFO__: string; // injected by vite.config.ts `define`
 
@@ -102,21 +105,24 @@ let shotKills = 0; // targets eliminated by the current shot → combo multiplie
 let ballBounces = 0; // ground contacts this shot → no-bounce skill bonus
 let launchX = 0; // launch X, for the long-shot skill bonus
 
-// active paper mood (advances one step per level via the day→night cycle)
-let currentTheme: C.Theme = C.THEMES.day;
-function applyTheme(lv: number): void {
-  currentTheme = C.themeForLevel(lv);
-  effects.setTheme(currentTheme);
-  blocks.setTheme(currentTheme);
-  targets.setTheme(currentTheme);
-  sling.setTheme(currentTheme);
-  setBallTheme(currentTheme);
-  app.renderer.setClearColor(currentTheme.skyBot);
+// current mode + story level pointer
+let mode: 'arcade' | 'story' = 'arcade';
+let storyId = 0;
+
+// push a paper mood into every render module
+function setTheme(theme: C.Theme): void {
+  effects.setTheme(theme);
+  blocks.setTheme(theme);
+  targets.setTheme(theme);
+  sling.setTheme(theme);
+  setBallTheme(theme);
+  app.renderer.setClearColor(theme.skyBot);
 }
 
 // brief slow-mo on big moments (multi-kills, TNT); eases the timestep back to 1
 const slow = { t: 0, dur: 1, scale: 1 };
 function slowmo(dur: number, scale: number): void {
+  if (!settings.get().slowmo) return;
   if (slow.t <= 0 || scale < slow.scale) {
     slow.dur = dur;
     slow.t = dur;
@@ -137,24 +143,44 @@ function removeBall(): void {
   ballMesh.visible = false;
 }
 
-function startLevel(lv: number): void {
+interface LevelDesc {
+  blocks: BlockDesc[];
+  targets: TargetDesc[];
+  shots: number;
+  theme: C.Theme;
+  label: string;
+}
+
+function loadLevel(desc: LevelDesc): void {
   removeBall();
   blocks.reset();
   targets.reset();
-  applyTheme(lv); // set the mood before spawning so paper textures use it
-  const layout = generateLevel(lv);
-  blocks.spawnFromDescs(layout.blocks);
-  targets.spawnFromDescs(layout.targets);
-  const params = C.levelParams(lv);
-  shotsTotal = params.shots;
-  shotsLeft = params.shots;
-  hud.setLevel(lv);
+  setTheme(desc.theme); // set the mood before spawning so paper textures use it
+  blocks.spawnFromDescs(desc.blocks);
+  targets.spawnFromDescs(desc.targets);
+  shotsTotal = desc.shots;
+  shotsLeft = desc.shots;
+  hud.setLevel(desc.label);
   hud.setShots(shotsLeft, shotsTotal);
   hud.setScore(score);
   hud.showNextButton(false);
   sling.enabled = false;
   sling.release();
   setState('settling');
+}
+
+function startArcadeLevel(lv: number): void {
+  level = lv;
+  const st = settings.get();
+  const theme = st.arcadeTheme === 'cycle' ? C.themeForLevel(lv) : C.THEMES[st.arcadeTheme];
+  const layout = generateLevel(lv);
+  loadLevel({ blocks: layout.blocks, targets: layout.targets, shots: C.levelParams(lv).shots, theme, label: `Level ${lv}` });
+}
+
+function loadStoryLevel(id: number): void {
+  storyId = id;
+  const built = story.buildLevel(id);
+  loadLevel({ blocks: built.blocks, targets: built.targets, shots: built.par, theme: built.theme, label: story.labelOf(id) });
 }
 
 // --- Leaderboard (shared games-lab service) -----------------------------------
@@ -185,14 +211,91 @@ async function submitSlingshotScore(finalScore: number): Promise<void> {
   await submitScore(LEADERBOARD_GAME, name, finalScore, { build: __BUILD_INFO__ });
 }
 
-function startGame(): void {
-  score = 0;
-  level = 1;
+// --- local best score (arcade) -------------------------------------------------
+const BEST_KEY = 'slingshot.best';
+function loadBest(): number {
+  try {
+    return Number(localStorage.getItem(BEST_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+function saveBest(v: number): void {
+  try {
+    localStorage.setItem(BEST_KEY, String(v));
+  } catch {
+    /* private mode */
+  }
+}
+
+// --- settings → engine ---------------------------------------------------------
+function applySettings(): void {
+  const s = settings.get();
+  audio.setMuted(s.muted);
+  effects.setShakeEnabled(s.shake);
+  effects.setGrainEnabled(s.grain);
+}
+
+// --- screen routing ------------------------------------------------------------
+function goHome(): void {
+  setState('ready');
   effects.reset();
+  hud.setHudVisible(false);
   hud.hideOverlay();
+  hud.showNextButton(false);
   leaderboardBtn.style.display = 'none';
+  menu.showHome({ best: loadBest(), onStory: goLevelSelect, onArcade: startArcade, onSettings: goSettings });
+}
+
+function goLevelSelect(): void {
+  menu.showLevelSelect({
+    worlds: story.worlds().map((w) => ({
+      name: w.name,
+      levels: w.ids.map((id) => ({
+        id,
+        label: story.labelOf(id),
+        stars: story.starsOf(id),
+        unlocked: story.isUnlocked(id),
+      })),
+    })),
+    totalStars: story.totalStars(),
+    maxStars: story.totalLevels() * 3,
+    onPick: startStory,
+    onBack: goHome,
+  });
+}
+
+function goSettings(): void {
+  menu.showSettings({
+    settings: settings.get(),
+    onChange: (key, value) => {
+      settings.set(key, value);
+      applySettings();
+    },
+    onBack: goHome,
+  });
+}
+
+function startArcade(): void {
+  mode = 'arcade';
+  menu.hide();
+  score = 0;
+  effects.reset();
+  leaderboardBtn.style.display = 'none';
+  hud.hideOverlay();
   hud.setHudVisible(true);
-  startLevel(1);
+  startArcadeLevel(1);
+}
+
+function startStory(id: number): void {
+  mode = 'story';
+  menu.hide();
+  score = 0;
+  effects.reset();
+  leaderboardBtn.style.display = 'none';
+  hud.hideOverlay();
+  hud.setHudVisible(true);
+  loadStoryLevel(id);
 }
 
 function gameOver(): void {
@@ -200,11 +303,14 @@ function gameOver(): void {
   sling.enabled = false;
   hud.setHudVisible(false);
   hud.showNextButton(false);
-  hud.showOverlay('Game over', [`Level ${level} · score ${score}`, 'Tap to play again']);
-
-  // Offer the leaderboard, and submit non-zero runs (asks the name once).
-  leaderboardBtn.style.display = 'block';
-  if (score > 0) void submitSlingshotScore(score);
+  if (mode === 'arcade') {
+    if (score > loadBest()) saveBest(score);
+    hud.showOverlay('Game over', [`Level ${level} · score ${score}`, 'Tap to play again']);
+    leaderboardBtn.style.display = 'block';
+    if (score > 0) void submitSlingshotScore(score);
+  } else {
+    hud.showOverlay('Out of shots', ['Tap for the map']);
+  }
 }
 
 function fire(x: number, y: number, vx: number, vy: number): void {
@@ -286,6 +392,7 @@ function shatterBlock(body: Matter.Body): void {
 /** TNT blast: white flash + boom, knock everything back, blow non-stone blocks. */
 function explodeAt(x: number, y: number): void {
   effects.shake();
+  effects.flash(x, y);
   slowmo(C.SLOWMO_TNT_DUR, C.SLOWMO_TNT_SCALE);
   effects.burst(x, y, 0, C.TNT_BURST);
   audio.boom();
@@ -322,15 +429,28 @@ function advanceShot(): void {
   removeBall();
   hud.showNextButton(false);
   if (targets.aliveCount() === 0) {
-    const bonus = shotsLeft * C.BONUS_PER_SHOT;
-    score += bonus;
-    hud.setScore(score);
     const stars = shotsLeft >= C.STAR3_SPARE ? 3 : shotsLeft >= C.STAR2_SPARE ? 2 : 1;
     hud.showStars(stars);
     audio.levelClear(stars);
-    if (bonus > 0) hud.scorePop(`Level clear! +${bonus}`);
-    level += 1;
-    startLevel(level);
+    if (mode === 'arcade') {
+      const bonus = shotsLeft * C.BONUS_PER_SHOT;
+      score += bonus;
+      hud.setScore(score);
+      if (bonus > 0) hud.scorePop(`Level clear! +${bonus}`);
+      level += 1;
+      startArcadeLevel(level);
+    } else {
+      story.recordStars(storyId, stars);
+      const next = storyId + 1;
+      if (next < story.totalLevels()) {
+        loadStoryLevel(next);
+      } else {
+        setState('gameover');
+        sling.enabled = false;
+        hud.setHudVisible(false);
+        hud.showOverlay('Campaign complete!', [`★ ${story.totalStars()}/${story.totalLevels() * 3}`, 'Tap for the map']);
+      }
+    }
   } else if (shotsLeft > 0) {
     setState('aiming');
     sling.enabled = true;
@@ -345,24 +465,20 @@ hud.initNextButton(() => {
   advanceShot();
 });
 
-// --- Input: tap to (re)start ------------------------------------------------------
+// --- Input: tap the in-game overlay to leave a game-over screen -------------------
 window.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   audio.unlock(); // every gesture re-arms audio (iOS needs it inside a gesture)
-  if ((state === 'ready' || state === 'gameover') && elapsed - stateAt > 0.6) {
-    startGame();
+  if (state === 'gameover' && elapsed - stateAt > 0.6) {
+    if (mode === 'arcade') startArcade();
+    else goLevelSelect();
   }
 });
 
 // --- Boot ----------------------------------------------------------------------------
-hud.setHudVisible(false);
-hud.showOverlay('Slingshot', [
-  'Topple the paper towers',
-  'Drag back anywhere to aim, release to fire',
-  'Tap to start',
-  `v ${__BUILD_INFO__}`,
-]);
+applySettings();
 (document.getElementById('slingshot-build-stamp') as HTMLDivElement).textContent = __BUILD_INFO__;
+goHome();
 
 startGameLoop((dt) => {
   // slow-mo: ease the world timestep down then back; the timer runs in real time
@@ -376,6 +492,11 @@ startGameLoop((dt) => {
   const dtw = dt * ts;
   elapsed += dtw;
   physics.stepPhysics(dtw);
+
+  // balloons hover (counter gravity); they pop on a light hit and drop their cargo
+  for (const b of blocks.buoyantBodies()) {
+    if (!b.isSleeping) Body.setVelocity(b, { x: b.velocity.x * C.BALLOON_DAMP, y: 0 });
+  }
 
   if (state === 'settling') {
     if (elapsed - stateAt >= C.SETTLE_MIN && physics.allStill()) {

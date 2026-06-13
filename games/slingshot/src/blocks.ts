@@ -55,7 +55,7 @@ function drawBlock(block: Block): void {
   const hpx = h * PXU;
   const cx = cw / 2;
   const cy = ch / 2;
-  const rad = Math.min(wpx, hpx) * 0.22;
+  const rad = Math.min(wpx, hpx) * (material === 'balloon' ? 0.46 : 0.22);
   const base = baseColor(material, tone);
 
   // baked offset shadow (down-right on screen), no blur
@@ -112,6 +112,34 @@ function drawBlock(block: Block): void {
     ctx.textBaseline = 'middle';
     ctx.fillText('!', cx, cy + hpx * 0.02);
     ctx.globalAlpha = 1;
+  } else if (material === 'balloon') {
+    // glossy specular highlight + a little knot at the bottom
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(cx - wpx * 0.18, cy - hpx * 0.2, wpx * 0.16, hpx * 0.16, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = darken(base, 0.12);
+    const knot = Math.min(hpx * 0.08, PAD * PXU * 0.7);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + hpx / 2 - 2);
+    ctx.lineTo(cx - wpx * 0.07, cy + hpx / 2 + knot);
+    ctx.lineTo(cx + wpx * 0.07, cy + hpx / 2 + knot);
+    ctx.closePath();
+    ctx.fill();
+  } else if (material === 'bouncy') {
+    // springy chevron stripes
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = Math.max(1.5, Math.min(wpx, hpx) * 0.08);
+    ctx.lineCap = 'round';
+    const rows = 3;
+    for (let i = 0; i < rows; i++) {
+      const yy = cy - hpx / 2 + (hpx * (i + 0.5)) / rows;
+      ctx.beginPath();
+      ctx.moveTo(cx - wpx * 0.3, yy + hpx * 0.05);
+      ctx.lineTo(cx, yy - hpx * 0.05);
+      ctx.lineTo(cx + wpx * 0.3, yy + hpx * 0.05);
+      ctx.stroke();
+    }
   }
 
   // top paper highlight (clipped to the rounded body)
@@ -224,4 +252,13 @@ export function materialOf(body: Matter.Body): C.BlockMaterial | null {
 export function breakImpactOf(body: Matter.Body): number {
   const block = byBodyId.get(body.id);
   return block ? C.MATERIALS[block.material].breakImpact : Infinity;
+}
+
+/** Live bodies of buoyant blocks (balloons) — main applies the rise force. */
+export function buoyantBodies(): Matter.Body[] {
+  const out: Matter.Body[] = [];
+  for (const block of pool) {
+    if (block.body && C.MATERIALS[block.material].buoyant) out.push(block.body);
+  }
+  return out;
 }
