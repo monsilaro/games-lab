@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import { createOrthoApp, startGameLoop } from '@games-lab/shared';
+import {
+  createOrthoApp,
+  startGameLoop,
+  submitScore,
+  showLeaderboard,
+  getStoredPlayerName,
+  promptPlayerName,
+} from '@games-lab/shared';
 
 declare const __BUILD_INFO__: string; // injected by vite.config.ts `define`
 
@@ -500,6 +507,31 @@ function saveHighScore(value: number): void {
   }
 }
 
+// --- Leaderboard (shared games-lab service) -----------------------------------
+const LEADERBOARD_GAME = 'flappy';
+const leaderboardBtn = document.getElementById('flappy-leaderboard-btn') as HTMLButtonElement;
+
+// The button is the only interactive element on the game-over screen. Stopping
+// propagation keeps the tap from also firing the window "tap to play again".
+leaderboardBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+leaderboardBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  showLeaderboard(LEADERBOARD_GAME, {
+    title: 'Flappy — Top',
+    playerName: getStoredPlayerName(),
+    highlightScore: score,
+  });
+});
+
+// Submit the just-played score: ask for a name once (remembered afterwards),
+// then fire-and-forget. Never throws — if the service is down, nothing happens
+// and the game is unaffected.
+async function submitFlappyScore(finalScore: number): Promise<void> {
+  const name = await promptPlayerName();
+  if (!name) return;
+  await submitScore(LEADERBOARD_GAME, name, finalScore, { build: __BUILD_INFO__ });
+}
+
 // --- Game state -----------------------------------------------------------------
 let state: GameState = 'ready';
 let birdY = 0;
@@ -528,6 +560,7 @@ function startGame(): void {
   resetGame();
   state = 'playing';
   overlayEl.style.display = 'none';
+  leaderboardBtn.style.display = 'none';
   scoreEl.style.display = 'block';
   spawnPipePair(app.worldWidth / 2 + PIPE_SPACING);
   birdVelocity = FLAP_IMPULSE;
@@ -551,6 +584,10 @@ function gameOver(): void {
     isNewBest ? '🏆 New best!' : `Best: ${highScore}`,
     'Tap to play again',
   ]);
+
+  // Offer the leaderboard, and submit non-zero scores (asks the name once).
+  leaderboardBtn.style.display = 'block';
+  if (score > 0) void submitFlappyScore(score);
 }
 
 // --- Input ----------------------------------------------------------------------

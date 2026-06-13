@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 
 export * from './theme';
+// Cross-game leaderboard client + overlay (network calls + DOM, no THREE).
+export * from './leaderboard';
 
 export interface OrthoApp {
   renderer: THREE.WebGLRenderer;
