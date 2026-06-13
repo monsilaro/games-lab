@@ -45,7 +45,12 @@ export function buy(s: RunState, i: number): boolean {
     const slot = firstFreeBench(s);
     if (slot !== null) placement = { kind: 'bench', i: slot };
   }
-  if (!placement) return false; // no room on board or bench
+  // Board + bench full: still allow the buy if it completes a 3→★ merge (which
+  // frees space). The temporary placement is consumed by tryMerge below.
+  if (!placement) {
+    if (!completesMerge(s, offer.heroId)) return false;
+    placement = { kind: 'bench', i: -1 };
+  }
 
   s.gold -= offer.cost;
   s.units.push({ iid: s.nextIid++, heroId: offer.heroId, star: 1, placement });
@@ -53,6 +58,11 @@ export function buy(s: RunState, i: number): boolean {
   tryMerge(s);
   autoField(s); // a merge may have freed a cell / left bench units to promote
   return true;
+}
+
+/** True if buying another ★1 of `heroId` would form a triple (and thus merge). */
+function completesMerge(s: RunState, heroId: string): boolean {
+  return s.units.filter((u) => u.heroId === heroId && u.star === 1).length >= 2;
 }
 
 /** Sell a unit: refund gold, remove it, free its slot. Returns the refund. */
