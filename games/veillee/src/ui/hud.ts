@@ -34,6 +34,7 @@ export interface UnitStatsInfo {
   abilityDesc: string;
   fielded: boolean; // true → stats include active synergies
   value: number; // gold refunded if sold
+  suggest: 'front' | 'back'; // recommended line
 }
 
 export interface Hud {
@@ -124,6 +125,7 @@ export function createHud(h: HudHandlers): Hud {
         `<div class="veillee-us-head"><span class="veillee-us-name">${u.name}</span>` +
         `<span class="veillee-us-star">${'★'.repeat(u.star)}</span></div>` +
         `<div class="veillee-us-traits">${u.originLabel} · ${u.roleLabel}</div>` +
+        `<div class="veillee-us-pos">Position : ${u.suggest === 'front' ? '⚔️ Avant' : '🏹 Arrière'}</div>` +
         `<div class="veillee-us-grid">` +
         `<span>PV</span><span>${u.hp}</span>` +
         `<span>ATQ</span><span>${u.atk}</span>` +

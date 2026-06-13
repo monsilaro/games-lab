@@ -18,6 +18,7 @@ import {
   IDENTITY_MOD,
   TRAITS,
   ABILITY_INFO,
+  FRONT_LINE_RANGE,
   fieldCap,
   hpLoss,
   sellValue,
@@ -272,6 +273,7 @@ export function startGame(): void {
     const rows = activeSynergies(state.units.filter((u) => u.placement.kind === 'cell').map((u) => u.heroId));
     const mod = fielded ? modifierFor(unit.heroId, rows) : IDENTITY_MOD;
     const ab = ABILITY_INFO[base.ability.kind];
+    const suggest: 'front' | 'back' = base.range <= FRONT_LINE_RANGE ? 'front' : 'back';
     hud.showUnitStats({
       name: cfg.name,
       star: unit.star,
@@ -285,13 +287,16 @@ export function startGame(): void {
       abilityDesc: ab.desc,
       fielded,
       value: sellValue(base.cost, unit.star),
+      suggest,
     });
+    board.setSuggestion(suggest);
   }
 
   function deselect(): void {
     selected = null;
     hud.hideUnitStats();
     board.setPlacementActive(false);
+    board.setSuggestion(null);
   }
 
   function gameOver(won: boolean): void {

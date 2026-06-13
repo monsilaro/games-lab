@@ -18,6 +18,10 @@ export const ECONOMY = {
 // Relative draw weight per cost tier (cheaper heroes appear more often).
 export const SHOP_ODDS: Record<1 | 2 | 3, number> = { 1: 6, 2: 3, 3: 1.5 };
 
+// Placement hint: units with range at or below this want the front line; longer
+// ranges want the back. (rows 0–1 = front, toward the enemy; 2–3 = back.)
+export const FRONT_LINE_RANGE = 1.6;
+
 export const COMBAT = {
   timeoutSec: 30, // a stalled fight resolves on remaining-hp%
   maxDt: 0.05, // clamp big frame gaps so the sim stays stable

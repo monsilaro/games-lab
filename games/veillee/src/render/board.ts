@@ -15,6 +15,8 @@ export interface Board {
   setPlacementVisible(v: boolean): void;
   /** Brighten the placement cells while a unit is selected/dragged. */
   setPlacementActive(v: boolean): void;
+  /** Glow the suggested rows for the selected unit (front rows, back rows, or none). */
+  setSuggestion(kind: 'front' | 'back' | null): void;
 }
 
 const { cols, rows, cell, halfGap, benchGap } = BOARD;
@@ -64,11 +66,16 @@ export function buildBoard(scene: THREE.Scene): Board {
   group.add(placement);
   const cellGeo = new THREE.PlaneGeometry(cell * 0.86, cell * 0.86);
   const cellMat = new THREE.MeshBasicMaterial({ color: PALETTE.iceCyan, transparent: true, opacity: 0.08 });
+  // Warm glow for the rows suggested for the selected unit.
+  const suggestMat = new THREE.MeshBasicMaterial({ color: PALETTE.ember, transparent: true, opacity: 0.2 });
+  const cellFills: THREE.Mesh[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const m = new THREE.Mesh(cellGeo, cellMat);
       m.rotation.x = -Math.PI / 2;
       m.position.set(colX(c), 0.06, playerZ(r)); // clearly above the snow top (y≈0.02) to avoid z-fighting
+      m.userData.row = r;
+      cellFills.push(m);
       placement.add(m);
       // crisp outline so the grid reads even when faint
       const edge = new THREE.LineSegments(
@@ -121,6 +128,14 @@ export function buildBoard(scene: THREE.Scene): Board {
     setPlacementActive: (v: boolean) => {
       cellMat.opacity = v ? 0.26 : 0.08;
       benchMat.opacity = v ? 0.28 : 0.12;
+      suggestMat.opacity = v ? 0.42 : 0.2;
+    },
+    setSuggestion: (kind: 'front' | 'back' | null) => {
+      for (const m of cellFills) {
+        const front = (m.userData.row as number) <= 1;
+        const want = kind === 'front' ? front : kind === 'back' ? !front : false;
+        m.material = want ? suggestMat : cellMat;
+      }
     },
   };
 }
