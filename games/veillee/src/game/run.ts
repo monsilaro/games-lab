@@ -59,6 +59,8 @@ export function startGame(): void {
   let cIid = 0;
   let lastTotal = 0;
   let shake = 0;
+  let combatTime = 0; // seconds of combat across the run
+  let survivorsTotal = 0; // player units alive summed at each fight's end
   const views = new Map<number, UnitView>(); // iid → view (preview: owned iid; combat: cIid)
 
   const hud = createHud({
@@ -213,6 +215,10 @@ export function startGame(): void {
   function finishCombat(winner: Team): void {
     phase = 'result';
     resultTimer = RESULT_PAUSE;
+    if (combat) {
+      combatTime += combat.elapsed;
+      survivorsTotal += combat.units.filter((u) => u.team === 'player' && u.state !== 'dead').length;
+    }
     if (winner === 'player') {
       state.clearedLevels++;
       if (state.level >= LEVELS.length) return gameOver(true);
@@ -311,7 +317,8 @@ export function startGame(): void {
       clearedLevels: state.clearedLevels,
       hp: state.hp,
       gold: state.gold,
-      elapsed: state.elapsed,
+      survivors: survivorsTotal,
+      combatTime,
       won,
     });
     lastTotal = breakdown.total;
@@ -322,6 +329,8 @@ export function startGame(): void {
   function restart(): void {
     hud.hideGameOver();
     state = newRun();
+    combatTime = 0;
+    survivorsTotal = 0;
     enterShop(false);
   }
 

@@ -27,12 +27,15 @@ export const COMBAT = {
   maxDt: 0.05, // clamp big frame gaps so the sim stays stable
 };
 
+// Score rewards COMP QUALITY, not mere survival: surviving units summed across
+// fights (domination) and fast combats matter most; clearing levels is a smaller base.
 export const SCORING = {
-  perLevel: 1000,
-  perHP: 50,
-  perGold: 10,
-  speedBudgetSec: 600, // finishing a won run under this earns a speed bonus
-  speedWeight: 2, // points per second under budget
+  perLevel: 500, // progress
+  perHP: 40, // few losses
+  perGold: 5, // economy left over
+  perSurvivor: 60, // units still standing at the end of each fight (the big one)
+  combatBudgetSec: 150, // sum of combat durations; under this (on a win) earns speed
+  speedWeight: 8, // points per second of combat under budget
 };
 
 /** Passive gold each shop phase: base + simple interest. */
@@ -63,7 +66,8 @@ export interface ScoreInput {
   clearedLevels: number;
   hp: number;
   gold: number;
-  elapsed: number;
+  survivors: number; // units alive summed across all fights
+  combatTime: number; // seconds of combat summed across all fights
   won: boolean;
 }
 
@@ -71,6 +75,7 @@ export interface ScoreBreakdown {
   levels: number;
   hp: number;
   gold: number;
+  survivors: number;
   speed: number;
   total: number;
 }
@@ -79,8 +84,9 @@ export function computeScore(inp: ScoreInput): ScoreBreakdown {
   const levels = inp.clearedLevels * SCORING.perLevel;
   const hp = Math.max(0, inp.hp) * SCORING.perHP;
   const gold = inp.gold * SCORING.perGold;
+  const survivors = inp.survivors * SCORING.perSurvivor;
   const speed = inp.won
-    ? Math.max(0, Math.round((SCORING.speedBudgetSec - inp.elapsed) * SCORING.speedWeight))
+    ? Math.max(0, Math.round((SCORING.combatBudgetSec - inp.combatTime) * SCORING.speedWeight))
     : 0;
-  return { levels, hp, gold, speed, total: levels + hp + gold + speed };
+  return { levels, hp, gold, survivors, speed, total: levels + hp + gold + survivors + speed };
 }

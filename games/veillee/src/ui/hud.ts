@@ -199,6 +199,7 @@ export function createHud(h: HudHandlers): Hud {
         `<h1>${won ? '🍁 Veillée gagnée' : 'Fin de la veillée'}</h1>` +
         `<div class="veillee-score">` +
         `<div><span>Niveaux</span><span>${b.levels}</span></div>` +
+        `<div><span>Survivants</span><span>${b.survivors}</span></div>` +
         `<div><span>PV restants</span><span>${b.hp}</span></div>` +
         `<div><span>Or</span><span>${b.gold}</span></div>` +
         `<div><span>Vitesse</span><span>${b.speed}</span></div>` +
