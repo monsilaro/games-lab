@@ -1,4 +1,4 @@
-import { ECONOMY, type ScoreBreakdown } from '../config';
+import { ECONOMY, TRAITS, type ScoreBreakdown } from '../config';
 import { HERO_BY_ID } from '../forge/heroes';
 import type { ShopOffer } from '../game/state';
 import type { SynergyRow } from '../game/synergy';
@@ -44,6 +44,13 @@ function fmtTime(sec: number): string {
 }
 
 const heroName = (id: string): string => HERO_BY_ID.get(id)?.name ?? id;
+
+/** "🌲 ⚔️" — the hero's Origine + Rôle icons, to read its traits at a glance. */
+function heroTraits(id: string): string {
+  const cfg = HERO_BY_ID.get(id);
+  if (!cfg) return '';
+  return `${TRAITS[cfg.origin].icon} ${TRAITS[cfg.role].icon}`;
+}
 
 export function createHud(h: HudHandlers): Hud {
   const statLevel = el<HTMLSpanElement>('veillee-stat-level');
@@ -107,7 +114,10 @@ export function createHud(h: HudHandlers): Hud {
           card.disabled = true;
         } else {
           card.classList.toggle('veillee-offer--poor', gold < offer.cost);
-          card.innerHTML = `<span class="veillee-offer-name">${heroName(offer.heroId)}</span><span class="veillee-offer-cost">⬢ ${offer.cost}</span>`;
+          card.innerHTML =
+            `<span class="veillee-offer-name">${heroName(offer.heroId)}</span>` +
+            `<span class="veillee-offer-traits">${heroTraits(offer.heroId)}</span>` +
+            `<span class="veillee-offer-cost">⬢ ${offer.cost}</span>`;
           card.addEventListener('click', () => h.onBuy(i));
         }
         offers.appendChild(card);

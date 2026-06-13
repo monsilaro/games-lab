@@ -36,7 +36,8 @@ export interface TraitTier {
 export interface TraitDef {
   id: Origin | Role;
   kind: 'origin' | 'role';
-  label: string;
+  label: string; // emoji + name, for the synergy panel
+  icon: string; // emoji alone, for compact spots (shop offer cards)
   tiers: TraitTier[]; // ascending by count
 }
 
@@ -49,6 +50,7 @@ export const TRAITS: Record<Origin | Role, TraitDef> = {
     id: 'Forêt',
     kind: 'origin',
     label: '🌲 Forêt',
+    icon: '🌲',
     tiers: [
       { count: 2, mod: { hpMul: 1.15 }, desc: '+15% PV' },
       { count: 4, mod: { hpMul: 1.35 }, desc: '+35% PV' },
@@ -58,6 +60,7 @@ export const TRAITS: Record<Origin | Role, TraitDef> = {
     id: 'Rivière',
     kind: 'origin',
     label: '🌊 Rivière',
+    icon: '🌊',
     tiers: [
       { count: 2, mod: { atkSpeedMul: 1.15 }, desc: '+15% vitesse d’attaque' },
       { count: 4, mod: { atkSpeedMul: 1.35 }, desc: '+35% vitesse d’attaque' },
@@ -67,6 +70,7 @@ export const TRAITS: Record<Origin | Role, TraitDef> = {
     id: 'Nuit',
     kind: 'origin',
     label: '🌙 Nuit',
+    icon: '🌙',
     tiers: [
       { count: 2, mod: { abilityPowerMul: 1.25 }, desc: '+25% puissance de capacité' },
       { count: 4, mod: { abilityPowerMul: 1.6 }, desc: '+60% puissance de capacité' },
@@ -77,6 +81,7 @@ export const TRAITS: Record<Origin | Role, TraitDef> = {
     id: 'Cogneur',
     kind: 'role',
     label: '⚔️ Cogneur',
+    icon: '⚔️',
     tiers: [
       { count: 2, mod: { atkMul: 1.15 }, desc: '+15% attaque' },
       { count: 4, mod: { atkMul: 1.4 }, desc: '+40% attaque' },
@@ -86,6 +91,7 @@ export const TRAITS: Record<Origin | Role, TraitDef> = {
     id: 'Tireur',
     kind: 'role',
     label: '🏹 Tireur',
+    icon: '🏹',
     tiers: [
       { count: 2, mod: { rangeAdd: 0.5 }, desc: '+0.5 portée' },
       { count: 4, mod: { rangeAdd: 1.2 }, desc: '+1.2 portée' },
@@ -95,6 +101,7 @@ export const TRAITS: Record<Origin | Role, TraitDef> = {
     id: 'Mystique',
     kind: 'role',
     label: '✨ Mystique',
+    icon: '✨',
     tiers: [
       { count: 2, mod: { manaGainMul: 1.3 }, desc: '+30% gain de mana' },
       { count: 4, mod: { manaGainMul: 1.7 }, desc: '+70% gain de mana' },

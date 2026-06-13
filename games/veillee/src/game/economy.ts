@@ -1,6 +1,6 @@
-import { UNITS, SHOP_ODDS, ECONOMY, income } from '../config';
+import { UNITS, SHOP_ODDS, ECONOMY, income, fieldCap } from '../config';
 import { HEROES } from '../forge/heroes';
-import { firstFreeBench, type RunState, type ShopOffer, type OwnedUnit } from './state';
+import { firstFreeBench, firstFreeCell, boardCount, type RunState, type ShopOffer, type OwnedUnit } from './state';
 import type { Slot } from '../render/board';
 
 const costOf = (heroId: string): number => UNITS[heroId]?.cost ?? 1;
@@ -28,17 +28,41 @@ export function rollShop(s: RunState): void {
   s.shop = Array.from({ length: ECONOMY.shopSize }, rollOne);
 }
 
-/** Buy offer `i` → onto the bench (fails if too poor, no offer, or bench full). */
+/**
+ * Buy offer `i`. Goes straight onto an open board cell if the field has room,
+ * otherwise the bench. Fails only if too poor, no offer, or nowhere to put it.
+ */
 export function buy(s: RunState, i: number): boolean {
   const offer = s.shop[i];
   if (!offer || s.gold < offer.cost) return false;
-  const slot = firstFreeBench(s);
-  if (slot === null) return false;
+
+  let placement: Slot | null = null;
+  if (boardCount(s) < fieldCap(s.clearedLevels)) {
+    const cell = firstFreeCell(s);
+    if (cell) placement = { kind: 'cell', col: cell.col, row: cell.row };
+  }
+  if (!placement) {
+    const slot = firstFreeBench(s);
+    if (slot !== null) placement = { kind: 'bench', i: slot };
+  }
+  if (!placement) return false; // no room on board or bench
+
   s.gold -= offer.cost;
-  s.units.push({ iid: s.nextIid++, heroId: offer.heroId, star: 1, placement: { kind: 'bench', i: slot } });
+  s.units.push({ iid: s.nextIid++, heroId: offer.heroId, star: 1, placement });
   s.shop[i] = null;
   tryMerge(s);
+  autoField(s); // a merge may have freed a cell / left bench units to promote
   return true;
+}
+
+/** Promote bench units onto open board cells until the field cap is reached. */
+export function autoField(s: RunState): void {
+  while (boardCount(s) < fieldCap(s.clearedLevels)) {
+    const benchUnit = s.units.find((u) => u.placement.kind === 'bench');
+    const cell = firstFreeCell(s);
+    if (!benchUnit || !cell) break;
+    benchUnit.placement = { kind: 'cell', col: cell.col, row: cell.row };
+  }
 }
 
 export function reroll(s: RunState): boolean {

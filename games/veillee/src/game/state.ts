@@ -1,4 +1,4 @@
-import { ECONOMY } from '../config';
+import { ECONOMY, BOARD } from '../config';
 import type { Slot } from '../render/board';
 
 export interface OwnedUnit {
@@ -49,4 +49,19 @@ export function firstFreeBench(s: RunState): number | null {
 /** Units currently fielded on the board (placement is a cell). */
 export function boardCount(s: RunState): number {
   return s.units.filter((u) => u.placement.kind === 'cell').length;
+}
+
+/** First empty board cell (scanned back rows → front), or null if the board is full. */
+export function firstFreeCell(s: RunState): { col: number; row: number } | null {
+  const taken = new Set(
+    s.units
+      .filter((u) => u.placement.kind === 'cell')
+      .map((u) => `${(u.placement as { col: number; row: number }).col},${(u.placement as { row: number }).row}`),
+  );
+  for (let row = BOARD.rows - 1; row >= 0; row--) {
+    for (let col = 0; col < BOARD.cols; col++) {
+      if (!taken.has(`${col},${row}`)) return { col, row };
+    }
+  }
+  return null;
 }

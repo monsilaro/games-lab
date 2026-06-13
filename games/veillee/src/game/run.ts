@@ -23,7 +23,7 @@ import { HERO_BY_ID } from '../forge/heroes';
 import { createCombat, step } from '../combat/engine';
 import type { CombatState, CombatUnit, Team } from '../combat/types';
 import { newRun, boardCount, type OwnedUnit } from './state';
-import { grantIncome, rollShop, buy, reroll } from './economy';
+import { grantIncome, rollShop, buy, reroll, autoField } from './economy';
 import { createHud } from '../ui/hud';
 
 type Phase = 'shop' | 'combat' | 'result' | 'over';
@@ -184,6 +184,7 @@ export function startGame(): void {
     combat = null;
     if (withIncome) grantIncome(state);
     rollShop(state);
+    autoField(state); // a cleared level raised the cap — fill it from the bench
     hud.hideBanner();
     hud.setPhaseLabel(null);
     board.setPlacementVisible(true);
