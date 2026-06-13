@@ -50,25 +50,26 @@ function livingEnemiesByRange(state: CombatState, u: CombatUnit): CombatUnit[] {
 
 function cast(state: CombatState, u: CombatUnit, primary: CombatUnit | null, events: CombatEvent[]): void {
   const ab = u.stats.ability;
+  const ap = u.stats.abilityPowerMul;
   const hit: number[] = [];
   switch (ab.kind) {
     case 'strike': {
       if (primary) {
-        applyDamage(primary, u.stats.atk * ab.power, events);
+        applyDamage(primary, u.stats.atk * ab.power * ap, events);
         hit.push(primary.iid);
       }
       break;
     }
     case 'volley': {
       for (const e of livingEnemiesByRange(state, u).slice(0, ab.targets ?? 2)) {
-        applyDamage(e, u.stats.atk * ab.power, events);
+        applyDamage(e, u.stats.atk * ab.power * ap, events);
         hit.push(e.iid);
       }
       break;
     }
     case 'hex': {
       if (primary) {
-        applyDamage(primary, u.stats.atk * ab.power, events);
+        applyDamage(primary, u.stats.atk * ab.power * ap, events);
         if (alive(primary)) {
           primary.slowTimer = ab.slowDur ?? 1.5;
           primary.slowFactor = ab.slow ?? 0.5;
@@ -86,7 +87,7 @@ function cast(state: CombatState, u: CombatUnit, primary: CombatUnit | null, eve
         if (low === null || r < low.hp / low.maxHp || (r === low.hp / low.maxHp && o.iid < low.iid)) low = o;
       }
       if (low) {
-        low.hp = Math.min(low.maxHp, low.hp + u.maxHp * ab.power);
+        low.hp = Math.min(low.maxHp, low.hp + u.maxHp * ab.power * ap);
         hit.push(low.iid);
       }
       break;

@@ -131,6 +131,50 @@
         font-size: 13px;
         font-weight: 700;
       }
+      /* Live synergy panel (left side) */
+      #veillee-synergies {
+        position: fixed;
+        z-index: 10;
+        left: calc(env(safe-area-inset-left, 0px) + 8px);
+        top: calc(env(safe-area-inset-top, 0px) + 46px);
+        display: none;
+        flex-direction: column;
+        gap: 5px;
+        max-width: 44vw;
+        pointer-events: none;
+      }
+      .veillee-syn {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 4px 8px;
+        border-radius: 9px;
+        background: rgba(28, 37, 65, 0.55);
+        opacity: 0.5;
+      }
+      .veillee-syn--on {
+        opacity: 1;
+        background: rgba(46, 196, 182, 0.22);
+        box-shadow: 0 0 0 1px rgba(46, 196, 182, 0.5) inset;
+      }
+      .veillee-syn-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .veillee-syn-count {
+        margin-left: auto;
+        font-size: 11px;
+        color: #caf0f8;
+      }
+      .veillee-syn-desc {
+        font-size: 10px;
+        font-weight: 600;
+        color: rgba(202, 240, 248, 0.85);
+      }
+
       #veillee-phase {
         position: fixed;
         z-index: 10;
@@ -322,6 +366,7 @@
       <span class="veillee-chip">⚔ <span id="veillee-stat-field">0/3</span></span>
       <span class="veillee-chip">⏱ <span id="veillee-stat-timer">0:00</span></span>
     </div>
+    <div id="veillee-synergies"></div>
     <div id="veillee-phase"></div>
     <div id="veillee-banner"></div>
 

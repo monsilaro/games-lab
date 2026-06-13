@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GABARITS, FORGE, type Build } from '../config';
+import { GABARITS, FORGE, type Build, type Origin, type Role } from '../config';
 import {
   buildBody,
   buildHead,
@@ -30,8 +30,8 @@ export interface HeroConfig {
   id: string;
   name: string;
   build: Build;
-  origin: string;
-  role: string;
+  origin: Origin;
+  role: Role;
   blurb: string;
   palette: HeroPalette;
   body: BodyShape;

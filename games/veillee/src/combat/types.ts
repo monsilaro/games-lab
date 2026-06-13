@@ -12,6 +12,7 @@ export interface CombatStats {
   manaMax: number;
   manaPerAttack: number;
   ability: Ability;
+  abilityPowerMul: number; // synergy multiplier on ability output (1 = none)
 }
 
 export interface CombatUnit {

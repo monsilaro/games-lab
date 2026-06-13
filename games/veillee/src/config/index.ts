@@ -3,3 +3,4 @@ export * from './visual';
 export * from './units';
 export * from './levels';
 export * from './rules';
+export * from './synergies';

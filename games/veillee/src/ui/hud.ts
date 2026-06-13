@@ -1,6 +1,7 @@
 import { ECONOMY, type ScoreBreakdown } from '../config';
 import { HERO_BY_ID } from '../forge/heroes';
 import type { ShopOffer } from '../game/state';
+import type { SynergyRow } from '../game/synergy';
 
 export interface HudHandlers {
   onBuy: (i: number) => void;
@@ -20,6 +21,7 @@ export interface HudStats {
 
 export interface Hud {
   setStats(s: HudStats): void;
+  renderSynergies(rows: SynergyRow[]): void;
   renderShop(shop: (ShopOffer | null)[], gold: number): void;
   setShopVisible(v: boolean): void;
   setPhaseLabel(text: string | null): void;
@@ -56,6 +58,7 @@ export function createHud(h: HudHandlers): Hud {
   const readyBtn = el<HTMLButtonElement>('veillee-ready-btn');
   const banner = el<HTMLDivElement>('veillee-banner');
   const gameover = el<HTMLDivElement>('veillee-gameover');
+  const synergies = el<HTMLDivElement>('veillee-synergies');
 
   rerollBtn.addEventListener('click', h.onReroll);
   readyBtn.addEventListener('click', h.onReady);
@@ -69,6 +72,26 @@ export function createHud(h: HudHandlers): Hud {
       statHp.textContent = `${s.hp}`;
       statField.textContent = `${s.fieldUsed}/${s.fieldCap}`;
       statTimer.textContent = fmtTime(s.elapsed);
+    },
+
+    renderSynergies(rows) {
+      if (rows.length === 0) {
+        synergies.style.display = 'none';
+        return;
+      }
+      synergies.style.display = 'flex';
+      synergies.innerHTML = rows
+        .map((r) => {
+          const on = r.tier > 0;
+          return (
+            `<div class="veillee-syn${on ? ' veillee-syn--on' : ''}">` +
+            `<span class="veillee-syn-head"><span>${r.label}</span>` +
+            `<span class="veillee-syn-count">${r.count}${r.tier ? `·${r.tier}` : ''}</span></span>` +
+            (on ? `<span class="veillee-syn-desc">${r.desc}</span>` : '') +
+            `</div>`
+          );
+        })
+        .join('');
     },
 
     renderShop(shopOffers, gold) {

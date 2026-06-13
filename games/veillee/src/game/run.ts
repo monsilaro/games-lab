@@ -8,10 +8,13 @@ import {
   STAR_SCALE,
   LEVELS,
   COMBAT,
+  IDENTITY_MOD,
   fieldCap,
   hpLoss,
   computeScore,
+  type SynergyMod,
 } from '../config';
+import { activeSynergies, modifierFor } from './synergy';
 import { setupScene } from '../scene';
 import { buildBoard, type Slot } from '../render/board';
 import { UnitView } from '../render/unitView';
@@ -47,6 +50,7 @@ export function startGame(): void {
       if (phase === 'shop' && buy(state, i)) {
         refreshPreview();
         renderShopUi();
+        renderSynergies();
       }
     },
     onReroll: () => {
@@ -81,23 +85,30 @@ export function startGame(): void {
   }
 
   // ---------- combat ----------
-  function makeCombatUnit(heroId: string, star: 1 | 2 | 3, team: Team, p: { x: number; z: number }): CombatUnit {
+  function makeCombatUnit(
+    heroId: string,
+    star: 1 | 2 | 3,
+    team: Team,
+    p: { x: number; z: number },
+    mod: SynergyMod = IDENTITY_MOD,
+  ): CombatUnit {
     const base = UNITS[heroId]!;
     const mult = Math.pow(STAR_SCALE, star - 1);
-    const maxHp = Math.round(base.hp * mult);
+    const maxHp = Math.round(base.hp * mult * mod.hpMul);
     return {
       iid: cIid++,
       heroId,
       team,
       star,
       stats: {
-        atk: base.atk * mult,
-        atkInterval: base.atkInterval,
-        rangeWorld: base.range * BOARD.cell,
+        atk: base.atk * mult * mod.atkMul,
+        atkInterval: base.atkInterval / mod.atkSpeedMul,
+        rangeWorld: (base.range + mod.rangeAdd) * BOARD.cell,
         moveSpeed: base.moveSpeed * BOARD.cell,
         manaMax: base.manaMax,
-        manaPerAttack: base.manaPerAttack,
+        manaPerAttack: base.manaPerAttack * mod.manaGainMul,
         ability: base.ability,
+        abilityPowerMul: mod.abilityPowerMul,
       },
       hp: maxHp,
       maxHp,
@@ -121,9 +132,13 @@ export function startGame(): void {
     clearViews();
 
     const units: CombatUnit[] = [];
-    for (const u of state.units) {
-      if (u.placement.kind !== 'cell') continue;
-      units.push(makeCombatUnit(u.heroId, u.star, 'player', board.cellToWorld('player', u.placement.col, u.placement.row)));
+    const fielded = state.units.filter((u) => u.placement.kind === 'cell');
+    const rows = activeSynergies(fielded.map((u) => u.heroId));
+    for (const u of fielded) {
+      const cell = u.placement as { col: number; row: number };
+      units.push(
+        makeCombatUnit(u.heroId, u.star, 'player', board.cellToWorld('player', cell.col, cell.row), modifierFor(u.heroId, rows)),
+      );
     }
     for (const e of LEVELS[state.level - 1]!) {
       units.push(makeCombatUnit(e.heroId, e.star, 'enemy', board.cellToWorld('enemy', e.col, e.row)));
@@ -175,6 +190,7 @@ export function startGame(): void {
     hud.setShopVisible(true);
     refreshPreview();
     renderShopUi();
+    renderSynergies();
   }
 
   function renderShopUi(): void {
@@ -191,6 +207,11 @@ export function startGame(): void {
       fieldCap: fieldCap(state.clearedLevels),
       elapsed: state.elapsed,
     });
+  }
+
+  function renderSynergies(): void {
+    const fielded = state.units.filter((u) => u.placement.kind === 'cell').map((u) => u.heroId);
+    hud.renderSynergies(activeSynergies(fielded));
   }
 
   function gameOver(won: boolean): void {
@@ -276,6 +297,7 @@ export function startGame(): void {
     dragging = null;
     refreshPreview();
     renderHud();
+    renderSynergies();
   });
 
   // ---------- main loop ----------
