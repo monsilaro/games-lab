@@ -18,9 +18,9 @@ import { AURORA } from './theme';
 // Configuration
 // ---------------------------------------------------------------------------
 
-// Replace LEADERBOARD_DOMAIN with your real domain, e.g. leaderboard.monsilaro.ca.
-// This is the ONE place the service URL is configured.
-export const LEADERBOARD_BASE_URL = 'https://LEADERBOARD_DOMAIN';
+// The ONE place the service URL is configured. Points at the games-lab-server
+// leaderboard service (Docker on the VPS, fronted by Caddy).
+export const LEADERBOARD_BASE_URL = 'https://leaderboard.monsilaro.ca';
 
 const PLAYER_NAME_KEY = 'games-lab.player-name';
 const MAX_NAME_LENGTH = 12;
