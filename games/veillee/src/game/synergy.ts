@@ -14,6 +14,7 @@ export interface SynergyRow {
   id: Origin | Role;
   kind: 'origin' | 'role';
   label: string;
+  icon: string;
   count: number;
   tier: number; // 0 = inactive, else the active threshold (2 or 4)
   desc: string; // active tier's bonus text (empty if inactive)
@@ -44,7 +45,7 @@ export function activeSynergies(heroIds: string[]): SynergyRow[] {
     if (count === 0) continue;
     const def = TRAITS[id];
     const at = activeTier(def, count);
-    rows.push({ id, kind: def.kind, label: def.label, count, tier: at.tier, desc: at.desc });
+    rows.push({ id, kind: def.kind, label: def.label, icon: def.icon, count, tier: at.tier, desc: at.desc });
   }
   return rows;
 }

@@ -131,48 +131,46 @@
         font-size: 13px;
         font-weight: 700;
       }
-      /* Live synergy panel (left side) */
+      /* Live synergy chips — compact, top-left under the HUD, never blocking taps */
       #veillee-synergies {
         position: fixed;
-        z-index: 10;
+        z-index: 9;
         left: calc(env(safe-area-inset-left, 0px) + 8px);
-        top: calc(env(safe-area-inset-top, 0px) + 46px);
+        top: calc(env(safe-area-inset-top, 0px) + 44px);
         display: none;
-        flex-direction: column;
-        gap: 5px;
-        max-width: 44vw;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        gap: 4px;
+        max-width: 52vw;
         pointer-events: none;
       }
-      .veillee-syn {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        padding: 4px 8px;
-        border-radius: 9px;
-        background: rgba(28, 37, 65, 0.55);
-        opacity: 0.5;
-      }
-      .veillee-syn--on {
-        opacity: 1;
-        background: rgba(46, 196, 182, 0.22);
-        box-shadow: 0 0 0 1px rgba(46, 196, 182, 0.5) inset;
-      }
-      .veillee-syn-head {
-        display: flex;
+      .veillee-syn-chip {
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        font-weight: 700;
-      }
-      .veillee-syn-count {
-        margin-left: auto;
+        gap: 3px;
+        padding: 3px 7px;
+        border-radius: 8px;
+        background: rgba(28, 37, 65, 0.6);
         font-size: 11px;
-        color: #caf0f8;
+        font-weight: 700;
+        opacity: 0.5;
+        white-space: nowrap;
       }
-      .veillee-syn-desc {
-        font-size: 10px;
+      .veillee-syn-chip em {
+        font-style: normal;
         font-weight: 600;
-        color: rgba(202, 240, 248, 0.85);
+        font-size: 10px;
+      }
+      .veillee-syn-chip.t2 {
+        opacity: 1;
+        color: #caf0f8;
+        box-shadow: 0 0 0 1px rgba(46, 196, 182, 0.6) inset;
+        background: rgba(46, 196, 182, 0.18);
+      }
+      .veillee-syn-chip.t4 {
+        opacity: 1;
+        color: #0a1128;
+        background: #ffd166;
       }
 
       /* Unit stats preview (tap a unit) — top right */
@@ -184,7 +182,7 @@
         display: none;
         flex-direction: column;
         gap: 4px;
-        width: min(46vw, 220px);
+        width: min(44vw, 210px);
         padding: 9px 11px;
         border-radius: 12px;
         border: 1px solid rgba(202, 240, 248, 0.35);
@@ -234,6 +232,20 @@
       .veillee-us-note {
         font-size: 10px;
         color: rgba(46, 196, 182, 0.9);
+      }
+      .veillee-us-sell {
+        margin-top: 4px;
+        pointer-events: auto; /* panel is non-interactive; the button is */
+        padding: 7px;
+        border: 1px solid rgba(255, 159, 28, 0.7);
+        border-radius: 9px;
+        background: rgba(255, 159, 28, 0.14);
+        color: #ff9f1c;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .veillee-us-sell:active {
+        transform: scale(0.96);
       }
 
       #veillee-phase {
@@ -310,6 +322,11 @@
         border: 1px solid rgba(202, 240, 248, 0.3);
         border-radius: 12px;
         background: rgba(28, 37, 65, 0.9);
+        animation: veilleeOfferPop 0.24s ease both;
+      }
+      @keyframes veilleeOfferPop {
+        0% { opacity: 0; transform: translateY(10px) scale(0.92); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
       }
       .veillee-offer:active {
         transform: scale(0.96);
@@ -397,14 +414,52 @@
         font-weight: 800;
         color: #ff9f1c !important;
       }
-      #veillee-replay-btn {
-        padding: 12px 26px;
+      .veillee-lb-status {
+        font-size: 14px;
+        font-weight: 700;
+        color: #2ec4b6;
+        min-height: 18px;
+      }
+      .veillee-go-actions {
+        display: flex;
+        gap: 10px;
+      }
+      #veillee-replay-btn,
+      #veillee-classement-btn {
+        padding: 12px 22px;
         border: 2px solid rgba(255, 159, 28, 0.7);
         border-radius: 14px;
         background: rgba(255, 159, 28, 0.12);
         color: #ff9f1c;
-        font-size: 17px;
+        font-size: 16px;
         font-weight: 700;
+      }
+      #veillee-classement-btn {
+        border-color: rgba(202, 240, 248, 0.6);
+        background: rgba(28, 37, 65, 0.85);
+        color: #caf0f8;
+      }
+      #veillee-replay-btn:active,
+      #veillee-classement-btn:active {
+        transform: scale(0.96);
+      }
+
+      /* Round-transition flash */
+      #veillee-flash {
+        position: fixed;
+        inset: 0;
+        z-index: 18;
+        background: radial-gradient(circle at 50% 45%, rgba(202, 240, 248, 0.5), rgba(10, 17, 40, 0) 60%);
+        opacity: 0;
+        pointer-events: none;
+      }
+      #veillee-flash.veillee-flash--on {
+        animation: veilleeFlash 0.45s ease-out;
+      }
+      @keyframes veilleeFlash {
+        0% { opacity: 0; }
+        25% { opacity: 1; }
+        100% { opacity: 0; }
       }
 
       #veillee-build-stamp {
@@ -445,6 +500,7 @@
     </div>
 
     <div id="veillee-gameover"></div>
+    <div id="veillee-flash"></div>
     <div id="veillee-build-stamp"></div>
 
     <script type="module" src="/src/main.ts"></script>

@@ -7,7 +7,12 @@ import type { Team } from '../combat/types';
 const LUNGE_DUR = 0.18;
 const FLASH_DUR = 0.16;
 const DEATH_DUR = 0.6;
+const RECOIL_DUR = 0.16;
+const RECOIL_DIST = 0.22;
 const WHITE = new THREE.Color(0xffffff);
+
+// One shared geometry for every HP bar (bg + fill of every unit).
+const BAR_GEO = new THREE.PlaneGeometry(BOARD.hpBarWidth, 0.13);
 
 interface MatBase {
   mat: THREE.MeshLambertMaterial;
@@ -33,6 +38,9 @@ export class UnitView {
   private lungeT = 0;
   private flashT = 0;
   private deathT = -1;
+  private recoilT = 0;
+  private recoilDX = 0;
+  private recoilDZ = 0;
   removable = false;
 
   constructor(cfg: HeroConfig, team: Team) {
@@ -40,12 +48,9 @@ export class UnitView {
     this.container.add(this.hero.root);
     this.container.scale.setScalar(BOARD.unitScale);
 
-    const bg = new THREE.Mesh(
-      new THREE.PlaneGeometry(BOARD.hpBarWidth, 0.13),
-      new THREE.MeshBasicMaterial({ color: 0x0c0f1a }),
-    );
+    const bg = new THREE.Mesh(BAR_GEO, new THREE.MeshBasicMaterial({ color: 0x0c0f1a }));
     this.fill = new THREE.Mesh(
-      new THREE.PlaneGeometry(BOARD.hpBarWidth, 0.13),
+      BAR_GEO,
       new THREE.MeshBasicMaterial({ color: team === 'player' ? PALETTE.auroraGreen : 0xe5484d }),
     );
     this.fill.position.z = 0.002;
@@ -67,6 +72,14 @@ export class UnitView {
   removeFrom(scene: THREE.Scene): void {
     scene.remove(this.container);
     scene.remove(this.bars);
+    // Dispose per-unit materials (geometries are shared/cached — leave them).
+    const disposeMats = (root: THREE.Object3D): void => {
+      root.traverse((o) => {
+        if (o instanceof THREE.Mesh) (o.material as THREE.Material).dispose();
+      });
+    };
+    disposeMats(this.container);
+    disposeMats(this.bars);
   }
 
   setSlotPosition(x: number, z: number): void {
@@ -101,6 +114,13 @@ export class UnitView {
   onHit(): void {
     this.flashT = FLASH_DUR;
   }
+  /** Shove away from an attacker (dx,dz = attacker→victim direction). */
+  onKnockback(dx: number, dz: number): void {
+    const len = Math.hypot(dx, dz) || 1;
+    this.recoilDX = dx / len;
+    this.recoilDZ = dz / len;
+    this.recoilT = RECOIL_DUR;
+  }
   onDeath(): void {
     if (this.deathT < 0) this.deathT = DEATH_DUR;
   }
@@ -116,6 +136,12 @@ export class UnitView {
       const reach = Math.sin((Math.max(0, this.lungeT) / LUNGE_DUR) * Math.PI) * 0.35;
       ox = Math.sin(this.facing) * reach;
       oz = Math.cos(this.facing) * reach;
+    }
+    if (this.recoilT > 0) {
+      this.recoilT -= dt;
+      const amt = (Math.max(0, this.recoilT) / RECOIL_DUR) * RECOIL_DIST;
+      ox += this.recoilDX * amt;
+      oz += this.recoilDZ * amt;
     }
     this.container.rotation.y = this.facing;
     this.container.position.set(this.baseX + ox, 0, this.baseZ + oz);

@@ -55,17 +55,31 @@ export function lambert(color: number, opts: MatOpts = {}): THREE.MeshLambertMat
   return m;
 }
 
+// Geometry cache: every hero is built from the same handful of primitive shapes,
+// so 16 units share a few dozen BufferGeometry instances instead of allocating
+// hundreds. Transforms live on the meshes (never the geometry), so sharing is safe.
+// Cached geometries are session-lived and must NOT be disposed per-unit.
+const geoCache = new Map<string, THREE.BufferGeometry>();
+function cached(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
+  let g = geoCache.get(key);
+  if (!g) {
+    g = make();
+    geoCache.set(key, g);
+  }
+  return g;
+}
+
 function box(w: number, h: number, d: number, m: THREE.Material): THREE.Mesh {
-  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+  return new THREE.Mesh(cached(`box:${w},${h},${d}`, () => new THREE.BoxGeometry(w, h, d)), m);
 }
 function cyl(rt: number, rb: number, h: number, m: THREE.Material, seg = RADIAL): THREE.Mesh {
-  return new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m);
+  return new THREE.Mesh(cached(`cyl:${rt},${rb},${h},${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg)), m);
 }
 function cone(r: number, h: number, m: THREE.Material, seg = RADIAL): THREE.Mesh {
-  return new THREE.Mesh(new THREE.ConeGeometry(r, h, seg), m);
+  return new THREE.Mesh(cached(`cone:${r},${h},${seg}`, () => new THREE.ConeGeometry(r, h, seg)), m);
 }
 function ico(r: number, m: THREE.Material, detail = 0): THREE.Mesh {
-  return new THREE.Mesh(new THREE.IcosahedronGeometry(r, detail), m);
+  return new THREE.Mesh(cached(`ico:${r},${detail}`, () => new THREE.IcosahedronGeometry(r, detail)), m);
 }
 
 function addLegs(g: THREE.Group, pal: HeroPalette, h: number, spread = 0.14): void {

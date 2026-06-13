@@ -46,6 +46,15 @@ export function hpLoss(level: number): number {
   return 2 + level;
 }
 
+/**
+ * Gold refunded when selling a unit. A ★N unit is worth its 3^(N-1) base copies;
+ * upgraded units pay a 1-gold tax to discourage buy/sell churn.
+ */
+export function sellValue(cost: number, star: number): number {
+  const copies = Math.pow(3, star - 1);
+  return cost * copies - (star > 1 ? 1 : 0);
+}
+
 export interface ScoreInput {
   clearedLevels: number;
   hp: number;

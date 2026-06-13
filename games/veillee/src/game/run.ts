@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import { createOrthoApp, startGameLoop } from '@games-lab/shared';
+import {
+  createOrthoApp,
+  startGameLoop,
+  submitScore,
+  showLeaderboard,
+  getStoredPlayerName,
+  promptPlayerName,
+} from '@games-lab/shared';
 import {
   PALETTE,
   BOARD,
@@ -13,6 +20,7 @@ import {
   ABILITY_INFO,
   fieldCap,
   hpLoss,
+  sellValue,
   computeScore,
   type SynergyMod,
 } from '../config';
@@ -25,11 +33,14 @@ import { HERO_BY_ID } from '../forge/heroes';
 import { createCombat, step } from '../combat/engine';
 import type { CombatState, CombatUnit, Team } from '../combat/types';
 import { newRun, boardCount, type OwnedUnit } from './state';
-import { grantIncome, rollShop, buy, reroll, autoField } from './economy';
+import { grantIncome, rollShop, buy, reroll, autoField, sellUnit } from './economy';
 import { createHud } from '../ui/hud';
 
 type Phase = 'shop' | 'combat' | 'result' | 'over';
 
+declare const __BUILD_INFO__: string;
+
+const LEADERBOARD_GAME = 'veillee';
 const COMBAT_END_PAUSE = 0.8; // let deaths finish before resolving
 const RESULT_PAUSE = 1.6; // banner dwell before next shop
 
@@ -45,6 +56,8 @@ export function startGame(): void {
   let resultTimer = 0;
   let clock = 0;
   let cIid = 0;
+  let lastTotal = 0;
+  let shake = 0;
   const views = new Map<number, UnitView>(); // iid → view (preview: owned iid; combat: cIid)
 
   const hud = createHud({
@@ -64,7 +77,35 @@ export function startGame(): void {
       if (phase === 'shop') startCombat();
     },
     onReplay: () => restart(),
+    onSell: () => {
+      if (phase !== 'shop' || !selected) return;
+      sellUnit(state, selected);
+      deselect();
+      refreshPreview();
+      renderShopUi();
+      renderSynergies();
+    },
+    onLeaderboard: () =>
+      showLeaderboard(LEADERBOARD_GAME, {
+        title: 'Veillée — Top',
+        playerName: getStoredPlayerName(),
+        highlightScore: lastTotal,
+      }),
   });
+
+  async function submitRun(won: boolean): Promise<void> {
+    const name = await promptPlayerName();
+    if (!name) {
+      hud.setLeaderboardStatus('');
+      return;
+    }
+    const res = await submitScore(LEADERBOARD_GAME, name, lastTotal, {
+      build: __BUILD_INFO__,
+      niveaux: state.clearedLevels,
+      gagne: won,
+    });
+    hud.setLeaderboardStatus(res ? `Rang #${res.rank} mondial` : 'Hors-ligne — score local');
+  }
 
   // ---------- view helpers ----------
   function clearViews(): void {
@@ -133,6 +174,7 @@ export function startGame(): void {
     deselect();
     hud.setShopVisible(false);
     hud.hideBanner();
+    hud.flashTransition();
     board.setPlacementVisible(false);
     clearViews();
 
@@ -242,6 +284,7 @@ export function startGame(): void {
       abilityLabel: ab.label,
       abilityDesc: ab.desc,
       fielded,
+      value: sellValue(base.cost, unit.star),
     });
   }
 
@@ -254,20 +297,21 @@ export function startGame(): void {
   function gameOver(won: boolean): void {
     phase = 'over';
     combat = null;
+    deselect();
     hud.setShopVisible(false);
     hud.hideBanner();
     board.setPlacementVisible(false);
     clearViews();
-    hud.gameOver(
+    const breakdown = computeScore({
+      clearedLevels: state.clearedLevels,
+      hp: state.hp,
+      gold: state.gold,
+      elapsed: state.elapsed,
       won,
-      computeScore({
-        clearedLevels: state.clearedLevels,
-        hp: state.hp,
-        gold: state.gold,
-        elapsed: state.elapsed,
-        won,
-      }),
-    );
+    });
+    lastTotal = breakdown.total;
+    hud.gameOver(won, breakdown);
+    void submitRun(won); // fire-and-forget; fail-soft
   }
 
   function restart(): void {
@@ -357,14 +401,24 @@ export function startGame(): void {
       for (const v of views.values()) v.tick(clock, dt, app.camera.position);
     } else if (phase === 'combat' && combat) {
       const events = step(combat, dt);
+      const byIid = new Map(combat.units.map((u) => [u.iid, u]));
       for (const ev of events) {
         const v = views.get(ev.iid);
-        if (!v) continue;
-        if (ev.type === 'attack' || ev.type === 'cast') v.onAttack();
-        else if (ev.type === 'hit') v.onHit();
-        else if (ev.type === 'death') v.onDeath();
+        if (ev.type === 'attack') {
+          v?.onAttack();
+          const att = byIid.get(ev.iid);
+          const vic = byIid.get(ev.targetIid);
+          const vv = views.get(ev.targetIid);
+          if (att && vic && vv) vv.onKnockback(vic.pos.x - att.pos.x, vic.pos.z - att.pos.z);
+        } else if (ev.type === 'cast') {
+          v?.onAttack();
+        } else if (ev.type === 'hit') {
+          v?.onHit();
+        } else if (ev.type === 'death') {
+          v?.onDeath();
+          shake = Math.min(0.4, shake + 0.14);
+        }
       }
-      const byIid = new Map(combat.units.map((u) => [u.iid, u]));
       for (const cu of combat.units) {
         const v = views.get(cu.iid);
         if (!v) continue;
@@ -397,6 +451,19 @@ export function startGame(): void {
       }
       resultTimer -= dt;
       if (resultTimer <= 0) enterShop(true);
+    }
+
+    // Camera shake on impacts (pans the ortho view; orientation untouched).
+    if (shake > 0.0005) {
+      shake = Math.max(0, shake - dt * 2);
+      app.camera.position.set(
+        BOARD_VIEW.cameraPos.x + Math.sin(clock * 80) * shake,
+        BOARD_VIEW.cameraPos.y + Math.cos(clock * 64) * shake,
+        BOARD_VIEW.cameraPos.z,
+      );
+    } else if (shake !== 0) {
+      shake = 0;
+      app.camera.position.copy(BOARD_VIEW.cameraPos);
     }
 
     app.renderer.render(app.scene, app.camera);

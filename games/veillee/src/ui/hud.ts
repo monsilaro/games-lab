@@ -8,6 +8,8 @@ export interface HudHandlers {
   onReroll: () => void;
   onReady: () => void;
   onReplay: () => void;
+  onSell: () => void;
+  onLeaderboard: () => void;
 }
 
 export interface HudStats {
@@ -31,6 +33,7 @@ export interface UnitStatsInfo {
   abilityLabel: string;
   abilityDesc: string;
   fielded: boolean; // true → stats include active synergies
+  value: number; // gold refunded if sold
 }
 
 export interface Hud {
@@ -40,10 +43,12 @@ export interface Hud {
   hideUnitStats(): void;
   renderShop(shop: (ShopOffer | null)[], gold: number): void;
   setShopVisible(v: boolean): void;
+  flashTransition(): void;
   setPhaseLabel(text: string | null): void;
   banner(title: string, sub: string): void;
   hideBanner(): void;
   gameOver(won: boolean, b: ScoreBreakdown): void;
+  setLeaderboardStatus(text: string): void;
   hideGameOver(): void;
 }
 
@@ -104,16 +109,12 @@ export function createHud(h: HudHandlers): Hud {
         return;
       }
       synergies.style.display = 'flex';
+      // Compact chips: icon + count, plus the bonus text only when a tier is active.
       synergies.innerHTML = rows
         .map((r) => {
-          const on = r.tier > 0;
-          return (
-            `<div class="veillee-syn${on ? ' veillee-syn--on' : ''}">` +
-            `<span class="veillee-syn-head"><span>${r.label}</span>` +
-            `<span class="veillee-syn-count">${r.count}${r.tier ? `·${r.tier}` : ''}</span></span>` +
-            (on ? `<span class="veillee-syn-desc">${r.desc}</span>` : '') +
-            `</div>`
-          );
+          const cls = r.tier >= 4 ? 'veillee-syn-chip t4' : r.tier >= 2 ? 'veillee-syn-chip t2' : 'veillee-syn-chip';
+          const bonus = r.tier > 0 ? ` <em>${r.desc}</em>` : '';
+          return `<span class="${cls}">${r.icon} ${r.count}${bonus}</span>`;
         })
         .join('');
     },
@@ -128,10 +129,13 @@ export function createHud(h: HudHandlers): Hud {
         `<span>ATQ</span><span>${u.atk}</span>` +
         `<span>Vitesse</span><span>${u.atkSpeed.toFixed(2)}/s</span>` +
         `<span>Portée</span><span>${u.range.toFixed(1)}</span>` +
+        `<span>Valeur</span><span>⬢ ${u.value}</span>` +
         `</div>` +
         `<div class="veillee-us-abil"><strong>${u.abilityLabel}</strong> — ${u.abilityDesc}</div>` +
-        (u.fielded ? `<div class="veillee-us-note">stats avec synergies</div>` : '');
+        (u.fielded ? `<div class="veillee-us-note">stats avec synergies</div>` : '') +
+        `<button type="button" id="veillee-us-sell" class="veillee-us-sell">Vendre +⬢ ${u.value}</button>`;
       unitStats.style.display = 'flex';
+      el<HTMLButtonElement>('veillee-us-sell').addEventListener('click', h.onSell);
     },
 
     hideUnitStats() {
@@ -151,6 +155,7 @@ export function createHud(h: HudHandlers): Hud {
           card.disabled = true;
         } else {
           card.classList.toggle('veillee-offer--poor', gold < offer.cost);
+          card.style.animationDelay = `${i * 0.05}s`;
           card.innerHTML =
             `<span class="veillee-offer-name">${heroName(offer.heroId)}</span>` +
             `<span class="veillee-offer-traits">${heroTraits(offer.heroId)}</span>` +
@@ -163,6 +168,14 @@ export function createHud(h: HudHandlers): Hud {
 
     setShopVisible(v) {
       shop.style.display = v ? 'flex' : 'none';
+    },
+
+    flashTransition() {
+      const f = document.getElementById('veillee-flash');
+      if (!f) return;
+      f.classList.remove('veillee-flash--on');
+      void f.offsetWidth; // reflow so the animation restarts
+      f.classList.add('veillee-flash--on');
     },
 
     setPhaseLabel(text) {
@@ -187,11 +200,33 @@ export function createHud(h: HudHandlers): Hud {
         `<div><span>PV restants</span><span>${b.hp}</span></div>` +
         `<div><span>Or</span><span>${b.gold}</span></div>` +
         `<div><span>Vitesse</span><span>${b.speed}</span></div>` +
-        `<div class="veillee-score-total"><span>Score</span><span>${b.total}</span></div>` +
+        `<div class="veillee-score-total"><span>Score</span><span id="veillee-score-total-val">0</span></div>` +
         `</div>` +
-        `<button type="button" id="veillee-replay-btn">Rejouer</button>`;
+        `<div id="veillee-lb-status" class="veillee-lb-status"></div>` +
+        `<div class="veillee-go-actions">` +
+        `<button type="button" id="veillee-classement-btn">🏆 Classement</button>` +
+        `<button type="button" id="veillee-replay-btn">Rejouer</button>` +
+        `</div>`;
       gameover.style.display = 'flex';
       el<HTMLButtonElement>('veillee-replay-btn').addEventListener('click', h.onReplay);
+      el<HTMLButtonElement>('veillee-classement-btn').addEventListener('click', h.onLeaderboard);
+
+      // satisfying count-up on the total
+      const totalEl = el<HTMLSpanElement>('veillee-score-total-val');
+      const target = b.total;
+      const startedAt = performance.now();
+      const dur = 800;
+      const tick = (now: number): void => {
+        const t = Math.min(1, (now - startedAt) / dur);
+        totalEl.textContent = String(Math.round(target * (1 - Math.pow(1 - t, 3))));
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+
+    setLeaderboardStatus(text) {
+      const node = document.getElementById('veillee-lb-status');
+      if (node) node.textContent = text;
     },
 
     hideGameOver() {

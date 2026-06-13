@@ -1,4 +1,4 @@
-import { UNITS, SHOP_ODDS, ECONOMY, income, fieldCap } from '../config';
+import { UNITS, SHOP_ODDS, ECONOMY, income, fieldCap, sellValue } from '../config';
 import { HEROES } from '../forge/heroes';
 import { firstFreeBench, firstFreeCell, boardCount, type RunState, type ShopOffer, type OwnedUnit } from './state';
 import type { Slot } from '../render/board';
@@ -53,6 +53,14 @@ export function buy(s: RunState, i: number): boolean {
   tryMerge(s);
   autoField(s); // a merge may have freed a cell / left bench units to promote
   return true;
+}
+
+/** Sell a unit: refund gold, remove it, free its slot. Returns the refund. */
+export function sellUnit(s: RunState, unit: OwnedUnit): number {
+  const refund = sellValue(costOf(unit.heroId), unit.star);
+  s.units = s.units.filter((u) => u !== unit);
+  s.gold += refund;
+  return refund;
 }
 
 /** Promote bench units onto open board cells until the field cap is reached. */
