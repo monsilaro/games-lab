@@ -1,5 +1,6 @@
-// Procedural WebAudio SFX (zero assets — every sound is synthesized) plus a
-// guarded haptics helper. Two platform caveats:
+// Procedural WebAudio SFX tuned for papercraft — soft, warm, woody. Marimba
+// pings, felt thuds, paper rustle. Zero assets; every sound is synthesized.
+// Two platform caveats:
 //   • iOS Safari only starts/resumes an AudioContext inside a user gesture, so
 //     `unlock()` must be called from a pointer handler (boot tap + sling grab).
 //   • iOS Safari has no Vibration API, so `vibrate()` is a no-op there; it fires
@@ -10,7 +11,6 @@ import * as C from './config';
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
-let ambientOn = false;
 
 /** Lazily build/resume the audio graph. Safe to call on every gesture. */
 export function unlock(): void {
@@ -24,7 +24,6 @@ export function unlock(): void {
     master.gain.value = C.SFX_MASTER_GAIN;
     master.connect(ctx.destination);
     noiseBuf = makeNoise(ctx);
-    if (C.AMBIENT_ENABLED) startAmbient();
   }
   if (ctx.state === 'suspended') void ctx.resume();
 }
@@ -37,98 +36,108 @@ function makeNoise(c: AudioContext): AudioBuffer {
   return buf;
 }
 
-/** A pitched blip with an attack/decay envelope, optionally gliding + delayed. */
-function tone(
-  freq: number,
-  dur: number,
-  type: OscillatorType,
-  gain: number,
-  glideTo?: number,
-  delay = 0,
-): void {
-  if (!ctx || !master) return;
-  const t = ctx.currentTime + delay;
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t);
-  if (glideTo !== undefined) osc.frequency.exponentialRampToValueAtTime(Math.max(1, glideTo), t + dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(g).connect(master);
-  osc.start(t);
-  osc.stop(t + dur + 0.02);
+const now = (): number => (ctx ? ctx.currentTime : 0);
+
+/** Attack/decay envelope on a gain param (exponential, click-free). */
+function env(g: AudioParam, t0: number, a: number, d: number, peak: number): void {
+  g.cancelScheduledValues(t0);
+  g.setValueAtTime(0.0001, t0);
+  g.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + a);
+  g.exponentialRampToValueAtTime(0.0001, t0 + a + d);
 }
 
-/** A filtered noise burst (impacts / shatter / explosion body). */
-function noise(dur: number, gain: number, filterType: BiquadFilterType, freq: number): void {
-  if (!ctx || !master || !noiseBuf) return;
-  const t = ctx.currentTime;
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuf;
-  const filt = ctx.createBiquadFilter();
-  filt.type = filterType;
-  filt.frequency.value = freq;
+/** A pitched blip, optionally gliding f0 → f1 over its duration. */
+function tone(type: OscillatorType, f0: number, f1: number, t0: number, dur: number, peak: number): void {
+  if (!ctx || !master) return;
+  const o = ctx.createOscillator();
   const g = ctx.createGain();
-  g.gain.setValueAtTime(gain, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(filt).connect(g).connect(master);
-  src.start(t);
-  src.stop(t + dur + 0.02);
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t0);
+  if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t0 + dur);
+  env(g.gain, t0, 0.006, dur, peak);
+  o.connect(g).connect(master);
+  o.start(t0);
+  o.stop(t0 + dur + 0.05);
+}
+
+/** A filtered noise burst — `bp` switches lowpass → bandpass (crinkle/rip). */
+function noise(t0: number, dur: number, peak: number, freq: number, bp = false): void {
+  if (!ctx || !master || !noiseBuf) return;
+  const s = ctx.createBufferSource();
+  s.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter();
+  f.type = bp ? 'bandpass' : 'lowpass';
+  f.frequency.value = freq;
+  if (bp) f.Q.value = 0.7;
+  const g = ctx.createGain();
+  env(g.gain, t0, 0.004, dur, peak);
+  s.connect(f).connect(g).connect(master);
+  s.start(t0);
+  s.stop(t0 + dur + 0.05);
+}
+
+/** Soft woody "marimba" note = sine body + a touch of triangle 2nd partial. */
+function marimba(f: number, t0: number, peak: number): void {
+  tone('sine', f, f, t0, 0.32, peak);
+  tone('triangle', f * 2.01, f * 2.01, t0, 0.12, peak * 0.35);
 }
 
 // --- public SFX -----------------------------------------------------------------
 export function launch(): void {
-  tone(420, 0.22, 'sawtooth', 0.22, 90); // downward whoosh
+  if (!ctx) return;
+  const t = now();
+  noise(t, 0.18, 0.32, 2600); // paper flick
+  tone('sine', 200, 110, t, 0.2, 0.32);
 }
 
 export function thud(rel: number): void {
-  const amt = Math.min(1, rel / 12);
-  tone(70, 0.16, 'sine', 0.16 + 0.28 * amt, 45);
-  noise(0.09, 0.05 + 0.12 * amt, 'lowpass', 600);
+  if (!ctx) return;
+  const t = now();
+  const v = Math.min(1, rel / 12);
+  tone('sine', 130, 60, t, 0.16, 0.35 + v * 0.3); // felt thump
+  noise(t, 0.07, 0.16 + v * 0.2, 900);
 }
 
 export function shatter(material: C.BlockMaterial): void {
-  const bright = material === 'ice';
-  noise(bright ? 0.22 : 0.14, bright ? 0.17 : 0.11, 'highpass', bright ? 2600 : 1300);
+  if (!ctx) return;
+  const t = now();
+  if (material === 'ice') {
+    noise(t, 0.18, 0.22, 5200, true); // tissue crinkle
+    for (let i = 0; i < 3; i++) tone('triangle', 1300 + Math.random() * 900, 800, t + i * 0.02, 0.1, 0.1);
+  } else if (material === 'stone') {
+    tone('sine', 120, 70, t, 0.12, 0.22); // cardboard whump
+    noise(t, 0.1, 0.2, 700);
+  } else {
+    noise(t, 0.16, 0.22, 3200, true); // paper rip
+    tone('triangle', 320, 180, t, 0.1, 0.14);
+  }
 }
 
 export function targetChime(combo: number): void {
-  const f = 600 + Math.min(combo - 1, 6) * 130; // pitch climbs with the combo
-  tone(f, 0.28, 'triangle', 0.22, f * 1.4);
+  if (!ctx) return;
+  const steps = [523, 587, 659, 784, 880, 988, 1175]; // pentatonic, climbs with the combo
+  const f = steps[Math.min(combo, steps.length) - 1] ?? 523;
+  marimba(f, now(), 0.34);
 }
 
 export function boom(): void {
-  tone(50, 0.5, 'sine', 0.4, 28);
-  noise(0.4, 0.28, 'lowpass', 420);
+  if (!ctx) return;
+  const t = now();
+  tone('sine', 110, 38, t, 0.4, 0.7); // soft paper "pomf", not a blast
+  tone('triangle', 150, 60, t, 0.22, 0.22);
+  noise(t, 0.28, 0.34, 1400);
 }
 
 export function levelClear(stars: number): void {
-  const notes = [523, 659, 784, 1046];
-  for (let i = 0; i <= stars && i < notes.length; i++) {
-    tone(notes[i]!, 0.18, 'triangle', 0.22, undefined, i * 0.12);
-  }
+  if (!ctx) return;
+  const t = now();
+  const notes = [523, 659, 784, 1047, 1319];
+  for (let i = 0; i <= stars + 1; i++) marimba(notes[i] ?? 1047, t + i * 0.12, 0.3);
 }
 
 export function uiTap(): void {
-  tone(880, 0.05, 'square', 0.09);
-}
-
-/** Optional sustained drone pad — off by default (AMBIENT_ENABLED). */
-function startAmbient(): void {
-  if (!ctx || !master || ambientOn) return;
-  ambientOn = true;
-  const g = ctx.createGain();
-  g.gain.value = 0.04;
-  g.connect(master);
-  for (const f of [55, 82.5]) {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = f;
-    osc.connect(g);
-    osc.start();
-  }
+  if (!ctx) return;
+  marimba(740, now(), 0.18);
 }
 
 // --- haptics --------------------------------------------------------------------

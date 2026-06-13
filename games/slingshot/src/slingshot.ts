@@ -1,7 +1,7 @@
-// Drag-to-aim input, the violet sling visual + elastic band, and the dashed
-// trajectory preview. The preview iterates the exact discrete Verlet recurrence
-// matter uses for a frictionAir-0 body under constant gravity, so the dots lie
-// on the real flight path.
+// Drag-to-aim input, the kraft-paper sling visual + flat elastic bands, and the
+// dashed trajectory preview. The preview iterates the exact discrete Verlet
+// recurrence matter uses for a frictionAir-0 body under constant gravity, so the
+// dots lie on the real flight path.
 
 import * as THREE from 'three';
 import type { OrthoApp } from '@games-lab/shared';
@@ -18,16 +18,17 @@ export class Slingshot {
   private startY = 0;
   private dragX = 0; // drag vector d = start − pointer, clamped
   private dragY = 0;
+  private readonly frameMat: THREE.MeshBasicMaterial;
   private readonly bandMat: THREE.MeshBasicMaterial;
+  private readonly cupMat: THREE.MeshBasicMaterial;
   private readonly bandL: THREE.Mesh;
   private readonly bandR: THREE.Mesh;
   private readonly cup: THREE.Mesh;
   private readonly dots: THREE.Mesh[] = [];
   private readonly dotMats: THREE.MeshBasicMaterial[] = [];
-  // preview gradient endpoints (cold = low power, hot = full power)
-  private readonly cold = new THREE.Color(C.PALETTE.preview);
-  private readonly hot = new THREE.Color(C.PALETTE.previewHot);
-  private readonly slingCol = new THREE.Color(C.PALETTE.sling);
+  // preview gradient endpoints (cold = low power → hot = full power)
+  private readonly cold = new THREE.Color(C.THEMES.day.preview);
+  private readonly hot = new THREE.Color(C.THEMES.day.ball);
   private readonly tmpCol = new THREE.Color();
 
   constructor(
@@ -35,38 +36,47 @@ export class Slingshot {
     private readonly app: OrthoApp,
     private readonly onFire: (x: number, y: number, vx: number, vy: number) => void,
   ) {
-    // the wooden "Y": a post and two fork arms, purely decorative
-    const slingMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.sling });
+    // the kraft "Y": a post and two fork arms (one shared material so a theme
+    // change recolors the whole frame at once)
+    this.frameMat = new THREE.MeshBasicMaterial({ color: C.THEMES.day.sling });
     const unit = new THREE.PlaneGeometry(1, 1);
-    const post = new THREE.Mesh(unit, slingMat);
-    post.scale.set(0.18, C.ANCHOR.y - 0.35, 1);
+    const post = new THREE.Mesh(unit, this.frameMat);
+    post.scale.set(0.22, C.ANCHOR.y - 0.35, 1);
     post.position.set(C.ANCHOR.x, (C.ANCHOR.y - 0.35) / 2, 0.3);
     scene.add(post);
     for (const side of [-1, 1]) {
-      const arm = new THREE.Mesh(unit, slingMat);
-      arm.scale.set(0.14, 0.75, 1);
-      arm.position.set(C.ANCHOR.x + side * 0.26, C.ANCHOR.y - 0.12, 0.3);
+      const arm = new THREE.Mesh(unit, this.frameMat);
+      arm.scale.set(0.17, 0.8, 1);
+      arm.position.set(C.ANCHOR.x + side * 0.3, C.ANCHOR.y - 0.12, 0.3);
       arm.rotation.z = -side * 0.45;
       scene.add(arm);
     }
+    // a thin white paper highlight down the post's left edge
+    const highlight = new THREE.Mesh(
+      unit,
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.32 }),
+    );
+    highlight.scale.set(0.05, C.ANCHOR.y - 0.5, 1);
+    highlight.position.set(C.ANCHOR.x - 0.08, (C.ANCHOR.y - 0.35) / 2, 0.31);
+    scene.add(highlight);
 
-    // elastic: two thick bands (fork tip → pouch) and a small pouch cup. One
-    // shared material so pull tension can brighten the whole sling at once.
-    this.bandMat = new THREE.MeshBasicMaterial({ color: C.PALETTE.sling });
+    // elastic: two flat bands (fork tip → pouch) + a pouch cup cradling the ball
+    this.bandMat = new THREE.MeshBasicMaterial({ color: C.THEMES.day.band });
+    this.cupMat = new THREE.MeshBasicMaterial({ color: C.THEMES.day.slingDark });
     this.bandL = new THREE.Mesh(unit, this.bandMat);
     this.bandR = new THREE.Mesh(unit, this.bandMat);
-    this.cup = new THREE.Mesh(unit, this.bandMat);
+    this.cup = new THREE.Mesh(unit, this.cupMat);
     for (const m of [this.bandL, this.bandR, this.cup]) {
       m.position.z = 0.45;
       m.frustumCulled = false;
       scene.add(m);
     }
 
-    // dashed trajectory preview: pooled ice-cyan dots fading along the arc
+    // dashed trajectory preview: pooled dots fading along the arc
     const dotGeo = new THREE.CircleGeometry(0.15, 10);
     for (let i = 0; i < C.PREVIEW_DOTS; i++) {
       const mat = new THREE.MeshBasicMaterial({
-        color: C.PALETTE.preview,
+        color: this.cold,
         transparent: true,
         opacity: 0.9 * (1 - i / C.PREVIEW_DOTS) + 0.1,
       });
@@ -84,6 +94,15 @@ export class Slingshot {
     window.addEventListener('pointermove', (e) => this.onMove(e));
     window.addEventListener('pointerup', (e) => this.onUp(e));
     window.addEventListener('pointercancel', (e) => this.onUp(e));
+  }
+
+  /** Push a new mood: recolor the frame, bands, cup, and preview endpoints. */
+  setTheme(theme: C.Theme): void {
+    this.frameMat.color.set(theme.sling);
+    this.bandMat.color.set(theme.band);
+    this.cupMat.color.set(theme.slingDark);
+    this.cold.set(theme.preview);
+    this.hot.set(theme.ball);
   }
 
   /** Cancel any in-progress drag and put the pouch back at rest. */
@@ -155,14 +174,8 @@ export class Slingshot {
     this.layoutBand(this.bandR, C.ANCHOR.x + 0.34, fy, this.pouch.x, this.pouch.y);
     // pouch cup: a short bar cradling the ball, perpendicular to the pull
     this.cup.position.set(this.pouch.x, this.pouch.y, 0.45);
-    this.cup.scale.set(C.BAND_WIDTH * 1.2, C.BALL_RADIUS * 1.9, 1);
+    this.cup.scale.set(C.BAND_WIDTH * 1.3, C.BALL_RADIUS * 1.9, 1);
     this.cup.rotation.z = Math.atan2(this.pouch.y - C.ANCHOR.y, this.pouch.x - C.ANCHOR.x);
-    // tension brightens the violet bands toward ice-cyan
-    const stretch = Math.min(
-      1,
-      Math.hypot(this.pouch.x - C.ANCHOR.x, this.pouch.y - C.ANCHOR.y) / C.MAX_DRAG,
-    );
-    this.bandMat.color.copy(this.slingCol).lerp(this.cold, stretch * 0.6);
   }
 
   /** Position a unit quad as a band from (x0,y0) to (x1,y1) with BAND_WIDTH. */
@@ -185,7 +198,7 @@ export class Slingshot {
     }
     const vx = this.dragX * C.LAUNCH_K;
     const vy = this.dragY * C.LAUNCH_K;
-    // dots shift cyan → ember and swell near launch as power rises
+    // dots shift preview → ball color and swell near launch as power rises
     const frac = Math.min(1, Math.hypot(this.dragX, this.dragY) / C.MAX_DRAG);
     this.tmpCol.copy(this.cold).lerp(this.hot, frac);
     // matter's integration for a frictionAir-0 body:

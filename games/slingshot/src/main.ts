@@ -23,7 +23,7 @@ declare const __BUILD_INFO__: string; // injected by vite.config.ts `define`
 
 const { Bodies, Body } = Matter;
 
-const app = createOrthoApp({ worldHeight: C.WORLD_HEIGHT, clearColor: C.PALETTE.sky });
+const app = createOrthoApp({ worldHeight: C.WORLD_HEIGHT, clearColor: C.THEMES.day.skyBot });
 const { scene } = app;
 
 // --- Camera: fixed, but with a guaranteed minimum horizontal view --------------
@@ -45,7 +45,9 @@ function frameView(): void {
   cam.bottom = -viewH / 2;
   cam.updateProjectionMatrix();
   camBase.x = C.MIN_VIEW_WIDTH / 2 - 1; // playfield spans x ∈ [-1, MIN_VIEW_WIDTH - 1]
-  camBase.y = C.GROUND_Y - C.SNOW_BAND + viewH / 2; // snow band pinned to the bottom
+  camBase.y = C.GROUND_Y - C.GROUND_BAND + viewH / 2; // ground band pinned to the bottom
+  // feed the live view rectangle to the paper background (sky/sun/clouds track it)
+  effects.setView(camBase.x, camBase.y, viewW / 2, viewH / 2);
 }
 app.onResize = frameView;
 frameView();
@@ -55,13 +57,35 @@ blocks.init(scene);
 targets.init(scene);
 effects.init(scene);
 
-const ballMesh = new THREE.Mesh(
-  new THREE.CircleGeometry(C.BALL_RADIUS, 24),
-  new THREE.MeshBasicMaterial({ color: C.PALETTE.projectile }),
-);
+// --- Paper ball: disc + ring + specular dot + a baked offset shadow ------------
+const ballDiscMat = new THREE.MeshBasicMaterial({ color: C.THEMES.day.ball });
+const ballRingMat = new THREE.MeshBasicMaterial({ color: C.THEMES.day.ballRing });
+const ballMesh = new THREE.Mesh(new THREE.CircleGeometry(C.BALL_RADIUS, 28), ballDiscMat);
 ballMesh.position.z = 0.3;
 ballMesh.visible = false;
+{
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(C.BALL_RADIUS, 24),
+    new THREE.MeshBasicMaterial({ color: 0x462d1e, transparent: true, opacity: 0.2 }),
+  );
+  shadow.position.set(0.05, -0.13, -0.02);
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(C.BALL_RADIUS * 0.74, C.BALL_RADIUS * 0.96, 28),
+    ballRingMat,
+  );
+  ring.position.z = 0.01;
+  const spec = new THREE.Mesh(
+    new THREE.CircleGeometry(C.BALL_RADIUS * 0.2, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }),
+  );
+  spec.position.set(-C.BALL_RADIUS * 0.3, C.BALL_RADIUS * 0.32, 0.02);
+  ballMesh.add(shadow, ring, spec);
+}
 scene.add(ballMesh);
+function setBallTheme(theme: C.Theme): void {
+  ballDiscMat.color.set(theme.ball);
+  ballRingMat.color.set(theme.ballRing);
+}
 let ballBody: Matter.Body | null = null;
 
 // --- Game state -----------------------------------------------------------------
@@ -77,6 +101,28 @@ let stillTime = 0;
 let shotKills = 0; // targets eliminated by the current shot → combo multiplier
 let ballBounces = 0; // ground contacts this shot → no-bounce skill bonus
 let launchX = 0; // launch X, for the long-shot skill bonus
+
+// active paper mood (advances one step per level via the day→night cycle)
+let currentTheme: C.Theme = C.THEMES.day;
+function applyTheme(lv: number): void {
+  currentTheme = C.themeForLevel(lv);
+  effects.setTheme(currentTheme);
+  blocks.setTheme(currentTheme);
+  targets.setTheme(currentTheme);
+  sling.setTheme(currentTheme);
+  setBallTheme(currentTheme);
+  app.renderer.setClearColor(currentTheme.skyBot);
+}
+
+// brief slow-mo on big moments (multi-kills, TNT); eases the timestep back to 1
+const slow = { t: 0, dur: 1, scale: 1 };
+function slowmo(dur: number, scale: number): void {
+  if (slow.t <= 0 || scale < slow.scale) {
+    slow.dur = dur;
+    slow.t = dur;
+    slow.scale = scale;
+  }
+}
 
 function setState(next: GameState): void {
   state = next;
@@ -95,6 +141,7 @@ function startLevel(lv: number): void {
   removeBall();
   blocks.reset();
   targets.reset();
+  applyTheme(lv); // set the mood before spawning so paper textures use it
   const layout = generateLevel(lv);
   blocks.spawnFromDescs(layout.blocks);
   targets.spawnFromDescs(layout.targets);
@@ -190,11 +237,12 @@ function killTarget(target: Target): void {
   if (!target.alive || !target.body) return;
   const { x, y } = target.body.position;
   targets.kill(target);
-  effects.burst(x, y, C.PALETTE.target, C.KILL_BURST);
+  effects.burst(x, y, 0, C.KILL_BURST); // color comes from the theme confetti palette
   audio.vibrate(20);
 
   // combo: each kill this shot is worth more than the last
   shotKills += 1;
+  if (shotKills >= 2) slowmo(C.SLOWMO_COMBO_DUR, C.SLOWMO_COMBO_SCALE);
   audio.targetChime(shotKills);
   const pts = C.POINTS_PER_TARGET * shotKills;
   score += pts;
@@ -238,7 +286,8 @@ function shatterBlock(body: Matter.Body): void {
 /** TNT blast: white flash + boom, knock everything back, blow non-stone blocks. */
 function explodeAt(x: number, y: number): void {
   effects.shake();
-  effects.burst(x, y, C.PALETTE.star, C.TNT_BURST);
+  slowmo(C.SLOWMO_TNT_DUR, C.SLOWMO_TNT_SCALE);
+  effects.burst(x, y, 0, C.TNT_BURST);
   audio.boom();
   audio.vibrate([0, 40, 30, 60]);
   for (const b of physics.explode(x, y, C.TNT_RADIUS, C.TNT_SPEED)) {
@@ -308,7 +357,7 @@ window.addEventListener('pointerdown', (e) => {
 // --- Boot ----------------------------------------------------------------------------
 hud.setHudVisible(false);
 hud.showOverlay('Slingshot', [
-  'Topple the towers under the aurora',
+  'Topple the paper towers',
   'Drag back anywhere to aim, release to fire',
   'Tap to start',
   `v ${__BUILD_INFO__}`,
@@ -316,8 +365,17 @@ hud.showOverlay('Slingshot', [
 (document.getElementById('slingshot-build-stamp') as HTMLDivElement).textContent = __BUILD_INFO__;
 
 startGameLoop((dt) => {
-  elapsed += dt;
-  physics.stepPhysics(dt);
+  // slow-mo: ease the world timestep down then back; the timer runs in real time
+  let ts = 1;
+  if (slow.t > 0) {
+    slow.t -= dt;
+    const k = Math.max(0, slow.t / slow.dur);
+    ts = slow.scale + (1 - slow.scale) * (1 - k);
+    if (slow.t <= 0) ts = 1;
+  }
+  const dtw = dt * ts;
+  elapsed += dtw;
+  physics.stepPhysics(dtw);
 
   if (state === 'settling') {
     if (elapsed - stateAt >= C.SETTLE_MIN && physics.allStill()) {
@@ -341,14 +399,14 @@ startGameLoop((dt) => {
         killTarget(target);
       }
     }
-    if (physics.allStill()) stillTime += dt;
+    if (physics.allStill()) stillTime += dtw;
     else stillTime = 0;
     if (stillTime >= C.STILL_TIME || elapsed - stateAt >= C.SHOT_TIMEOUT) advanceShot();
   }
 
   physics.syncMeshes();
   targets.pulse(elapsed);
-  effects.update(dt);
+  effects.update(dtw);
   app.camera.position.x = camBase.x + effects.shakeOffset.x;
   app.camera.position.y = camBase.y + effects.shakeOffset.y;
   app.renderer.render(scene, app.camera);

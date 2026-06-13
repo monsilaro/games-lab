@@ -1,28 +1,98 @@
 // All tuning lives here. Tweak, push, replay.
+//
+// Papercraft re-skin: the look is fully theme-driven. One active `Theme` (a flat
+// set of paper colors) is pushed into every render module per level via
+// `themeForLevel`. The day→night cycle advances one mood per level.
 
-import { AURORA } from '@games-lab/shared';
+// --- paper moods (the whole look) ----------------------------------------------
+export interface ThemeMat {
+  woodLight: string;
+  woodDark: string;
+  ice: string;
+  stone: string;
+  tnt: string;
+  fuse: string; // the "!" glyph on TNT
+}
+export interface Theme {
+  name: string;
+  stars?: boolean; // night: scatter twinkling paper stars; sun reads as a moon
+  skyTop: string;
+  skyBot: string;
+  sun: string;
+  sunRing: string;
+  cloud: string;
+  hillBack: string;
+  hillMid: string;
+  hillFront: string;
+  groundEdge: string;
+  mat: ThemeMat;
+  target: string;
+  targetCore: string;
+  sling: string;
+  slingDark: string;
+  band: string;
+  ball: string;
+  ballRing: string;
+  preview: string;
+  confetti: string[];
+}
 
-// "Aurora borealis" palette (shared theme) — the orange warmth belongs to the
-// projectile ONLY; everything else stays cold.
-export const PALETTE = {
-  sky: AURORA.night,
-  snow: AURORA.snow, // ground band
-  blockDark: AURORA.deepBlue,
-  blockLight: AURORA.slateBlue,
-  projectile: AURORA.ember, // the ONLY warm color
-  trail: AURORA.emberLight,
-  target: AURORA.auroraGreen,
-  targetCore: AURORA.night, // inner disc that makes targets read as rings
-  sling: AURORA.violet,
-  preview: AURORA.iceCyan,
-  previewHot: AURORA.ember, // preview dots lerp toward this at full power
-  star: AURORA.white,
-  ice: AURORA.iceCyan, // fragile block (drawn translucent)
-  stone: 0x6c7a91, // tough block — cool grey, distinct from the slate woods
-  tnt: 0x7b2cbf, // explosive block — deep violet (stays cold per the theme)
-  auroraA: AURORA.auroraGreen, // sky ribbon gradient: green …
-  auroraB: AURORA.violet, // … to violet
-} as const;
+export type ThemeName = 'day' | 'sunset' | 'meadow' | 'night';
+
+export const THEMES: Record<ThemeName, Theme> = {
+  day: {
+    name: 'Day',
+    skyTop: '#ffd58f', skyBot: '#fff4e2',
+    sun: '#ffc24d', sunRing: '#ffd882', cloud: '#fffaf2',
+    hillBack: '#bcd66e', hillMid: '#8cc057', hillFront: '#69a64d', groundEdge: '#7dba59',
+    mat: { woodLight: '#e2895a', woodDark: '#c2663e', ice: '#bfe0e8', stone: '#cbc4b4', tnt: '#e0533f', fuse: '#ffb43c' },
+    target: '#1f9d8f', targetCore: '#fff6e9',
+    sling: '#b07a4f', slingDark: '#875734', band: '#74502f',
+    ball: '#ef6f51', ballRing: '#ff9070', preview: '#e98a55',
+    confetti: ['#e2895a', '#e9c46a', '#f4a261', '#1f9d8f', '#fffaf2'],
+  },
+  sunset: {
+    name: 'Sunset',
+    skyTop: '#f5805e', skyBot: '#ffd7a3',
+    sun: '#ff7a45', sunRing: '#ffb06b', cloud: '#ffe7da',
+    hillBack: '#94a060', hillMid: '#728c4e', hillFront: '#566f3f', groundEdge: '#67804a',
+    mat: { woodLight: '#d97a4f', woodDark: '#a85a36', ice: '#dcc4e4', stone: '#bba99a', tnt: '#d63f4f', fuse: '#ffce6b' },
+    target: '#16a394', targetCore: '#fff2e6',
+    sling: '#9a6a44', slingDark: '#724b2d', band: '#5e3a22',
+    ball: '#ef6f51', ballRing: '#ff9070', preview: '#ff9a6b',
+    confetti: ['#d97a4f', '#ffce6b', '#ff7a45', '#16a394', '#ffe7da'],
+  },
+  meadow: {
+    name: 'Meadow',
+    skyTop: '#a9def8', skyBot: '#f1fbff',
+    sun: '#fff0a8', sunRing: '#ffe27a', cloud: '#ffffff',
+    hillBack: '#a3d46c', hillMid: '#74c25b', hillFront: '#4fa358', groundEdge: '#63b35e',
+    mat: { woodLight: '#e3a25b', woodDark: '#b87a3e', ice: '#c2e9f5', stone: '#d0d3cd', tnt: '#e0573f', fuse: '#ffc14d' },
+    target: '#e76f51', targetCore: '#fff6e9',
+    sling: '#b07a4f', slingDark: '#875734', band: '#74502f',
+    ball: '#e94f37', ballRing: '#ff7a5f', preview: '#5fa6bb',
+    confetti: ['#e3a25b', '#e9c46a', '#e76f51', '#4fa358', '#ffffff'],
+  },
+  night: {
+    name: 'Night',
+    stars: true,
+    skyTop: '#161d44', skyBot: '#3a3f6e',
+    sun: '#f3ecd0', sunRing: '#cdd6f0', cloud: '#525d8a', // sun => pale moon
+    hillBack: '#3f6357', hillMid: '#2f4d42', hillFront: '#243c33', groundEdge: '#365446',
+    mat: { woodLight: '#d98a5e', woodDark: '#a85f3a', ice: '#9fb8d8', stone: '#8a93a6', tnt: '#e0533f', fuse: '#ffce6b' },
+    target: '#2fd0b0', targetCore: '#e9f4ef',
+    sling: '#b07a4f', slingDark: '#875734', band: '#9a7a55',
+    ball: '#ff8a5c', ballRing: '#ffb088', preview: '#ffce8a',
+    confetti: ['#ffce6b', '#ff8a5c', '#2fd0b0', '#cdd6f0', '#ffffff'],
+  },
+};
+
+// Day → night cycle: advance one mood per level when the cycle is on. Meadow is
+// a standalone alternate (not part of the cycle).
+export const CYCLE: ThemeName[] = ['day', 'sunset', 'night'];
+export function themeForLevel(level: number): Theme {
+  return THEMES[CYCLE[(level - 1) % CYCLE.length]!];
+}
 
 // view / world — 1 unit ≈ 1 m, y up, ground top surface at y = 0.
 // The playfield spans x ∈ [-1, MIN_VIEW_WIDTH - 1] and is always fully visible:
@@ -30,8 +100,8 @@ export const PALETTE = {
 export const WORLD_HEIGHT = 14; // world units visible vertically (min)
 export const MIN_VIEW_WIDTH = 24; // world units guaranteed visible horizontally
 export const GROUND_Y = 0;
-export const SNOW_BAND = 1.4; // visible snow strip below GROUND_Y
-export const STAR_COUNT = 70;
+export const GROUND_BAND = 1.4; // visible ground strip below GROUND_Y (camera framing)
+export const STAR_COUNT = 60; // night-only paper stars
 export const MAX_DT = 0.05; // clamp delta time (background tab, hiccups), s
 
 // physics — matter runs directly in world units (see physics.ts)
@@ -39,31 +109,29 @@ export const FIXED_DT = 1 / 60; // fixed matter timestep, s
 export const GRAVITY = 20; // units/s² (snappier than 9.8 at this scale)
 
 // slingshot
-export const ANCHOR = { x: 2.2, y: 2.6 } as const; // pouch rest position
-export const LAUNCH_K = 4.5; // launch speed (units/s) per unit of drag
-export const V_MAX = 22; // speed cap → 45° range ≈ V_MAX²/GRAVITY ≈ 24 units
+export const ANCHOR = { x: 2.7, y: 3.0 } as const; // pouch rest position
+export const LAUNCH_K = 4.6; // launch speed (units/s) per unit of drag
+export const V_MAX = 23; // speed cap → 45° range ≈ V_MAX²/GRAVITY ≈ 26 units
 export const MAX_DRAG = V_MAX / LAUNCH_K;
-export const MIN_DRAG = 0.3; // below this, release cancels instead of firing
-export const BALL_RADIUS = 0.32;
+export const MIN_DRAG = 0.35; // below this, release cancels instead of firing
+export const BALL_RADIUS = 0.38;
 export const BALL_DENSITY = 0.004; // ~4× block density: satisfying knockdowns
-export const BALL_RESTITUTION = 0.4;
+export const BALL_RESTITUTION = 0.36;
 export const BALL_FRICTION = 0.5;
 export const PREVIEW_DOTS = 28; // dashed trajectory arc
 export const PREVIEW_STEP = 7; // physics ticks between consecutive dots
 // 28 × 7 = 196 ticks ≈ 3.3 s of flight: a full-power shot is previewed all the
 // way down to the ground, never truncated mid-air.
 
-// blocks
-export const COL_W = 0.35; // vertical column size
-export const COL_H = 1.2;
-export const PLANK_H = 0.3; // horizontal plank thickness
-export const PLANK_OVERHANG = 0.8; // plank width = column gap + this
+// blocks (chunkier paper silhouettes)
+export const COL_W = 0.46; // vertical column size
+export const COL_H = 1.3;
+export const PLANK_H = 0.4; // horizontal plank thickness
+export const PLANK_OVERHANG = 0.95; // plank width = column gap + this
 export const BLOCK_FRICTION = 0.6;
-export const BLOCK_BREAK_IMPACT = 7.0; // units/s — blocks shatter above this (lower = more fragile)
-export const BLOCK_BREAK_BURST = 10; // particles per shattered block
 
 // targets
-export const TARGET_RADIUS = 0.34;
+export const TARGET_RADIUS = 0.44;
 export const TARGET_PULSE_AMP = 0.06; // scale pulse amplitude
 export const TARGET_PULSE_HZ = 1; // pulses per second
 
@@ -79,14 +147,21 @@ export const GROUND_KILL_IMPACT = 2.0; // gentler: targets falling to the ground
 export const SHAKE_IMPACT = 6.0; // hits this hard shake the screen
 export const SHAKE_DURATION = 0.25; // s
 export const SHAKE_MAGNITUDE = 0.22; // world units
-export const IMPACT_BURST = 6; // particles per hard impact
-export const KILL_BURST = 14; // particles per eliminated target
-export const PARTICLE_POOL = 64;
-export const PARTICLE_SPEED = 4.5; // units/s
-export const PARTICLE_LIFE = 0.5; // s
-export const TRAIL_LENGTH = 3; // fading sprites behind the flying ball
-export const TRAIL_INTERVAL = 0.05; // s between trail stamps
-export const TRAIL_LIFE = 0.35; // s for a stamp to fade out
+export const IMPACT_BURST = 8; // confetti bits per hard impact
+export const KILL_BURST = 16; // confetti bits per eliminated target
+
+// confetti (flat paper bits — replaces the old ember particle burst)
+export const CONFETTI_POOL = 160;
+export const CONFETTI_SPEED = 5.5; // units/s initial burst speed
+export const CONFETTI_GRAVITY = 16; // units/s² (lighter than the world — paper)
+export const CONFETTI_LIFE = 1.1; // s
+export const CONFETTI_SIZE = 0.13; // base half-size of a bit (world units)
+
+// slow-mo juice (main.ts) — brief timestep ease-down on big moments
+export const SLOWMO_COMBO_DUR = 0.45;
+export const SLOWMO_COMBO_SCALE = 0.35;
+export const SLOWMO_TNT_DUR = 0.5;
+export const SLOWMO_TNT_SCALE = 0.3;
 
 // pools
 export const BLOCK_POOL = 48;
@@ -119,47 +194,37 @@ export function levelParams(level: number): LevelParams {
 }
 
 // tower geometry randomness (levelgen.ts)
-export const GAP_MIN = 1.1; // column gap — keep > 2·TARGET_RADIUS + margin
-export const GAP_MAX = 1.6;
+export const GAP_MIN = 1.2; // column gap — keep > 2·TARGET_RADIUS + margin
+export const GAP_MAX = 1.7;
 export const GAP_SHRINK = 0.9; // gap multiplier per floor going up
 export const FLOOR_JITTER = 0.05; // ≪ COL_W so towers stay stable
 
-// --- living aurora sky (effects.ts) ---------------------------------------------
-export const AURORA_BANDS = 3; // number of drifting ribbons
-export const AURORA_BASE_Y = 7; // world height the lowest ribbon sits at
-export const AURORA_DRIFT = 0.35; // horizontal drift speed (units/s of phase)
-export const AURORA_WAVE_AMP = 1.1; // vertical undulation amplitude (world units)
-export const AURORA_ALPHA = 0.26; // peak opacity of a ribbon
-export const STAR_TWINKLE_HZ = 0.5; // base twinkle rate (each star phased)
-
 // --- slingshot / aim polish (slingshot.ts) --------------------------------------
-export const BAND_WIDTH = 0.09; // thickness of each elastic band quad (world units)
+export const BAND_WIDTH = 0.12; // thickness of each elastic band quad (world units)
 
-// --- block materials (config-driven; blocks.ts + levelgen.ts) --------------------
+// --- block materials (physics only; the look comes from the theme palette) ------
 export type BlockMaterial = 'wood' | 'ice' | 'stone' | 'tnt';
 export interface MaterialDef {
-  color: number; // mesh + burst tint (wood overrides per dark/light tone)
   breakImpact: number; // relative speed (units/s) above which it shatters
   density: number; // matter density — wood matches the prior default
   restitution: number;
-  opacity: number; // < 1 → translucent (ice)
-  burst: number; // particles spawned when it shatters
+  burst: number; // confetti bits spawned when it shatters
 }
 export const MATERIALS: Record<BlockMaterial, MaterialDef> = {
-  wood: { color: PALETTE.blockLight, breakImpact: BLOCK_BREAK_IMPACT, density: 0.001, restitution: 0, opacity: 1, burst: BLOCK_BREAK_BURST },
-  ice: { color: PALETTE.ice, breakImpact: 4.0, density: 0.0007, restitution: 0.1, opacity: 0.5, burst: 16 },
-  stone: { color: PALETTE.stone, breakImpact: 18.0, density: 0.0026, restitution: 0, opacity: 1, burst: 8 },
-  tnt: { color: PALETTE.tnt, breakImpact: 5.0, density: 0.0013, restitution: 0, opacity: 1, burst: 18 },
+  wood: { breakImpact: 6.5, density: 0.001, restitution: 0, burst: 12 },
+  ice: { breakImpact: 3.6, density: 0.0007, restitution: 0.12, burst: 18 },
+  stone: { breakImpact: 17.0, density: 0.0026, restitution: 0, burst: 8 },
+  tnt: { breakImpact: 5.0, density: 0.0013, restitution: 0, burst: 20 },
 };
 
 // TNT explosion (main.ts orchestrates, physics.ts applies the impulse)
-export const TNT_RADIUS = 3.2; // world units of blast reach
-export const TNT_SPEED = 16; // outward launch speed (units/s) at the blast center
-export const TNT_BURST = 26; // white flash particles
+export const TNT_RADIUS = 3.4; // world units of blast reach
+export const TNT_SPEED = 17; // outward launch speed (units/s) at the blast center
+export const TNT_BURST = 28; // confetti bits on a blast
 
 // --- combo & skill-shot scoring (main.ts) ---------------------------------------
 // combo multiplier = number of targets killed so far this shot (1×, 2×, 3× …)
-export const COMBO_NAMES = ['', '', 'DOUBLE KILL', 'TRIPLE KILL', 'MULTI KILL'] as const;
+export const COMBO_NAMES = ['', '', 'DOUBLE', 'TRIPLE', 'MULTI', 'WONDERFUL'] as const;
 export const SKILL_NOBOUNCE_BONUS = 75; // target killed before the ball first bounces
 export const SKILL_LONGSHOT_BONUS = 100; // kill far downrange from the launch point
 export const LONGSHOT_DIST = 12; // world units from launch X to the kill
@@ -167,5 +232,4 @@ export const STAR3_SPARE = 2; // spare shots on clear → 3 stars
 export const STAR2_SPARE = 1; // → 2 stars (else 1)
 
 // --- audio (audio.ts) -----------------------------------------------------------
-export const SFX_MASTER_GAIN = 0.32; // 0..1 master volume for synth SFX
-export const AMBIENT_ENABLED = false; // subtle drone pad — off by default
+export const SFX_MASTER_GAIN = 0.36; // 0..1 master volume for the paper SFX
