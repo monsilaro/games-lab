@@ -1,0 +1,15 @@
+{
+  "name": "Neon Snake",
+  "short_name": "Snake",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0d0e15",
+  "theme_color": "#00f2fe",
+  "icons": [
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

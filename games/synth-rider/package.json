@@ -1,0 +1,22 @@
+{
+  "name": "@games-lab/synth-rider",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.177.0",
+    "@games-lab/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/three": "^0.177.0",
+    "@types/node": "^25.9.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

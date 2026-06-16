@@ -71,6 +71,19 @@
         color: #8e8e93;
         font-size: 15px;
       }
+      .leaderboard-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 24px;
+        text-decoration: none;
+        color: #8e8e93;
+        font-size: 15px;
+      }
+      .leaderboard-link:active {
+        color: #f2f2f7;
+      }
     </style>
   </head>
   <body>
@@ -93,11 +106,22 @@
         <h2>🕯️ Veillée</h2>
         <p>Québécois-folklore auto-battler — draft heroes, score-attack</p>
       </a>
+      <a class="card" href="./snake/">
+        <h2>🐍 Snake</h2>
+        <p>Neon Snake — Dodge the walls & eat code spheres under cyberpunk neon lights</p>
+      </a>
+      <a class="card" href="./synth-rider/">
+        <h2>🚀 SynthRider 3D</h2>
+        <p>3D retro-synthwave dodge runner — ride the neon grid at warp speeds</p>
+      </a>
       <a class="card" href="./space-invaders/">
         <h2>👾 Space Invaders</h2>
         <p>Classic arcade shooter — drag to move, tap to fire</p>
       </a>
     </div>
+    <a class="leaderboard-link" href="https://leaderboard.monsilaro.ca">
+      🏆 Leaderboard
+    </a>
     <script type="module">
       // GitHub Pages CDN caches HTML for up to 10 min. Stamping the link at
       // click time busts that cache, so games always open in their latest
