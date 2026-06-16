@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Snake</title>
+    <!-- Google Fonts for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-color: #0d0e15;
+        --neon-cyan: #00f2fe;
+        --neon-pink: #ff007f;
+        --text-color: #e2e8f0;
+        --panel-bg: rgba(20, 21, 33, 0.85);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        height: 100%;
+        width: 100%;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Outfit', -apple-system, system-ui, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      /* Cyberpunk background grid */
+      body::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: 
+          linear-gradient(rgba(0, 242, 254, 0.02) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 242, 254, 0.02) 1px, transparent 1px);
+        background-size: 30px 30px;
+        background-position: center;
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      .game-wrapper {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        width: 100%;
+        max-width: 620px;
+        padding: 16px;
+      }
+
+      .header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        gap: 8px;
+      }
+
+      h1 {
+        font-size: 2.8rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        color: #fff;
+        text-shadow: 
+          0 0 5px #fff,
+          0 0 10px var(--neon-cyan),
+          0 0 20px var(--neon-cyan),
+          0 0 35px var(--neon-cyan);
+        animation: neonPulse 2s ease-in-out infinite alternate;
+      }
+
+      .scoreboard {
+        display: flex;
+        gap: 20px;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-weight: 800;
+      }
+
+      .score-box {
+        background: rgba(26, 27, 38, 0.9);
+        border: 1px solid rgba(0, 242, 254, 0.25);
+        padding: 6px 14px;
+        border-radius: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .score-box span.val {
+        color: var(--neon-cyan);
+        text-shadow: 0 0 5px rgba(0, 242, 254, 0.4);
+      }
+
+      .score-box span.high-val {
+        color: var(--neon-pink);
+        text-shadow: 0 0 5px rgba(255, 0, 127, 0.4);
+      }
+
+      .container {
+        position: relative;
+        background: rgba(13, 14, 21, 0.95);
+        border: 2px solid rgba(0, 242, 254, 0.35);
+        border-radius: 16px;
+        padding: 4px;
+        box-shadow: 
+          0 0 25px rgba(0, 242, 254, 0.2),
+          inset 0 0 15px rgba(0, 242, 254, 0.08);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: box-shadow 0.4s ease, border-color 0.4s ease;
+        width: 100%;
+        max-width: 600px;
+        aspect-ratio: 1/1;
+      }
+
+      .container.game-over-glow {
+        border-color: rgba(255, 0, 127, 0.5);
+        box-shadow: 
+          0 0 30px rgba(255, 0, 127, 0.25),
+          inset 0 0 20px rgba(255, 0, 127, 0.1);
+      }
+
+      canvas {
+        display: block;
+        background-color: #0c0d14;
+        border-radius: 12px;
+        width: 100%;
+        height: 100%;
+      }
+
+      .instructions {
+        text-align: center;
+        font-size: 0.85rem;
+        color: #71717a;
+        letter-spacing: 1px;
+        line-height: 1.6;
+      }
+
+      .instructions span {
+        color: var(--neon-cyan);
+        background: rgba(0, 242, 254, 0.08);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 600;
+      }
+
+      /* Game state overlays */
+      .overlay {
+        position: absolute;
+        inset: 4px;
+        background: rgba(10, 11, 18, 0.9);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+        z-index: 100;
+        border-radius: 12px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        text-align: center;
+        padding: 24px;
+        backdrop-filter: blur(4px);
+      }
+
+      .overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .overlay h2 {
+        font-size: 2.2rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 4px;
+      }
+
+      .overlay p {
+        font-size: 1rem;
+        color: #a1a1aa;
+        max-width: 320px;
+        line-height: 1.5;
+        margin-bottom: 8px;
+      }
+
+      /* Controls & Buttons */
+      .btn {
+        background: transparent;
+        border: 2px solid var(--neon-cyan);
+        color: var(--neon-cyan);
+        padding: 10px 24px;
+        border-radius: 30px;
+        font-family: inherit;
+        font-weight: 800;
+        font-size: 1rem;
+        letter-spacing: 2px;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        box-shadow: 0 0 10px rgba(0, 242, 254, 0.1);
+        text-transform: uppercase;
+        min-width: 180px;
+      }
+
+      .btn:hover {
+        background: var(--neon-cyan);
+        color: #0a0b12;
+        box-shadow: 0 0 20px var(--neon-cyan);
+        transform: translateY(-2px);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn-pink {
+        border-color: var(--neon-pink);
+        color: var(--neon-pink);
+        box-shadow: 0 0 10px rgba(255, 0, 127, 0.1);
+      }
+
+      .btn-pink:hover {
+        background: var(--neon-pink);
+        color: #0a0b12;
+        box-shadow: 0 0 20px var(--neon-pink);
+      }
+
+      .btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        align-items: center;
+      }
+
+      @keyframes neonPulse {
+        from {
+          text-shadow: 
+            0 0 4px #fff,
+            0 0 8px var(--neon-cyan),
+            0 0 16px var(--neon-cyan),
+            0 0 30px var(--neon-cyan);
+        }
+        to {
+          text-shadow: 
+            0 0 6px #fff,
+            0 0 12px var(--neon-cyan),
+            0 0 22px var(--neon-cyan),
+            0 0 40px var(--neon-cyan);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-wrapper">
+      <div class="header">
+        <h1>Neon Snake</h1>
+        <div class="scoreboard">
+          <div class="score-box">
+            <span>Score:</span>
+            <span id="scoreVal" class="val">0</span>
+          </div>
+          <div class="score-box">
+            <span>High:</span>
+            <span id="highVal" class="high-val">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="container" id="gameContainer">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        
+        <!-- Main menu overlay -->
+        <div class="overlay active" id="menuOverlay">
+          <h2 style="color: var(--neon-cyan); text-shadow: 0 0 10px var(--neon-cyan);">Cyber Snake</h2>
+          <p>Dodge the walls and your own tail. Eat code spheres to grow.</p>
+          <div class="btn-group">
+            <button class="btn" id="startBtn">Initialize</button>
+            <button class="btn btn-pink" id="menuLeaderboardBtn">🏆 Leaderboard</button>
+          </div>
+        </div>
+
+        <!-- Game Over overlay -->
+        <div class="overlay" id="gameOverOverlay">
+          <h2 style="color: var(--neon-pink); text-shadow: 0 0 10px var(--neon-pink);">System Failure</h2>
+          <p>Snake loop collapsed.<br>Final Score: <span id="finalScoreVal" style="color: var(--neon-cyan); font-weight: 800;">0</span></p>
+          <div class="btn-group">
+            <button class="btn" id="restartBtn">Reboot</button>
+            <button class="btn btn-pink" id="gameOverLeaderboardBtn">🏆 Leaderboard</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="instructions">
+        Use <span>WASD</span> or <span>Arrows</span> to control direction.<br>
+        Press <span>Space</span> to Pause / Resume.
+      </p>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
