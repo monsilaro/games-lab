@@ -1,19 +1,22 @@
 {
   "name": "space-invaders",
-  "version": "1.0.0",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "three": "^0.160.0",
-    "@games-lab/shared": "workspace:*"
+    "@games-lab/shared": "workspace:*",
+    "three": "^0.177.0"
   },
   "devDependencies": {
-    "@types/three": "^0.160.0",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.10"
+    "@types/node": "^25.9.2",
+    "@types/three": "^0.177.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
   }
 }

@@ -96,6 +96,28 @@ importers:
         specifier: ^6.3.5
         version: 6.4.3(@types/node@25.9.2)
 
+  games/space-invaders:
+    dependencies:
+      '@games-lab/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      three:
+        specifier: ^0.177.0
+        version: 0.177.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.2
+        version: 25.9.2
+      '@types/three':
+        specifier: ^0.177.0
+        version: 0.177.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vite:
+        specifier: ^6.3.5
+        version: 6.4.3(@types/node@25.9.2)
+
   games/synth-rider:
     dependencies:
       '@games-lab/shared':

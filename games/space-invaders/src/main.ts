@@ -99,10 +99,6 @@ interface Explosion {
 const app = createOrthoApp({ worldHeight: WORLD_HEIGHT, clearColor: COLORS.background });
 const { renderer, scene, camera } = app;
 
-// Lighting for the glow effects
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
-
 const groundY = -WORLD_HEIGHT / 2;
 const ceilingY = WORLD_HEIGHT / 2;
 
@@ -185,12 +181,11 @@ function fireBullet(x: number, y: number, direction: 'up' | 'down' = 'up'): void
       bullet.x = x;
       bullet.y = y;
       bullet.direction = direction;
+      // Enemy shots fall slower than the player's shots rise — gives you a chance to dodge
+      bullet.speed = direction === 'up' ? BULLET_SPEED : ENEMY_BULLET_SPEED;
       bullet.alive = true;
       bullet.mesh.position.set(x, y, 0.2);
       bullet.mesh.visible = true;
-
-      // Play sound (visual feedback)
-      flashPlayer();
       return;
     }
   }
@@ -290,7 +285,9 @@ function updateEnemies(dt: number): void {
   const aliveEnemies = enemies.filter(e => e.alive);
   if (aliveEnemies.length > 0 && Math.random() < ENEMY_BULLET_CHANCE * aliveEnemies.length * dt * 60) {
     const shooter = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
-    fireBullet(shooter.x, shooter.y - ENEMY_SIZE / 2, 'down');
+    if (shooter) {
+      fireBullet(shooter.x, shooter.y - ENEMY_SIZE / 2, 'down');
+    }
   }
 }
 
@@ -498,12 +495,12 @@ startBtn.addEventListener('click', () => {
   startGame();
 });
 
-// Tap to start/restart
+// Tap to start / restart / continue
 window.addEventListener('pointerdown', () => {
-  if (state === 'ready') {
+  if (state === 'ready' || state === 'gameover') {
     startGame();
-  } else if (state === 'gameover' || state === 'victory') {
-    startGame();
+  } else if (state === 'victory') {
+    nextWave();
   }
 });
 
@@ -529,19 +526,10 @@ function flashPlayer(): void {
   }, 50);
 }
 
-function startGame(): void {
-  state = 'playing';
-  score = 0;
-  lives = INITIAL_LIVES;
-  wave = 1;
-  elapsed = 0;
-  invincibilityTime = INVINCIBILITY_TIME;
-  enemySpeed = ENEMY_SPEED_BASE + (wave - 1) * ENEMY_SPEED_INCREMENT;
-
-  scoreDisplay.textContent = '0';
-  updateLivesDisplay();
-
-  // Reset player
+// Repopulate the board for a fresh wave (enemies/shields/bullets/explosions + player),
+// without touching score or lives. Shared by startGame() and nextWave().
+function spawnWave(): void {
+  // Reset player to center
   playerX = 0;
   playerY = groundY + 1.5;
   playerMesh.position.set(playerX, playerY, 0.1);
@@ -551,10 +539,8 @@ function startGame(): void {
 
   // Reset enemies
   for (const enemy of enemies) {
-    const col = enemy.col;
-    const row = enemy.row;
-    enemy.x = (col - (ENEMY_COLS - 1) / 2) * ENEMY_SPACING;
-    enemy.y = ceilingY - 2 - row * ENEMY_SPACING;
+    enemy.x = (enemy.col - (ENEMY_COLS - 1) / 2) * ENEMY_SPACING;
+    enemy.y = ceilingY - 2 - enemy.row * ENEMY_SPACING;
     enemy.alive = true;
     enemy.mesh.position.set(enemy.x, enemy.y, 0.1);
     enemy.mesh.visible = true;
@@ -567,26 +553,52 @@ function startGame(): void {
     shield.mesh.visible = true;
   }
 
-  // Clear bullets
+  // Clear bullets + explosions
   for (const bullet of bullets) {
     bullet.alive = false;
     bullet.mesh.visible = false;
   }
-
-  // Clear explosions
   for (const explosion of explosions) {
     explosion.alive = false;
     explosion.mesh.visible = false;
   }
 
-  // Show HUD, hide overlay
+  enemyDirection = 1;
+  enemyMoveTimer = 0;
+  invincibilityTime = INVINCIBILITY_TIME;
+}
+
+function showPlayingUI(): void {
   hud.style.display = 'flex';
   gameOverlay.style.display = 'none';
   startBtn.style.display = 'none';
   leaderboardBtn.style.display = 'none';
+}
 
-  enemyDirection = 1;
-  enemyMoveTimer = 0;
+// Full reset — first start and game-over restart.
+function startGame(): void {
+  state = 'playing';
+  score = 0;
+  lives = INITIAL_LIVES;
+  wave = 1;
+  elapsed = 0;
+  enemySpeed = ENEMY_SPEED_BASE;
+
+  scoreDisplay.textContent = '0';
+  updateLivesDisplay();
+
+  spawnWave();
+  showPlayingUI();
+}
+
+// Advance to the next wave — keeps score + lives, enemies get faster.
+function nextWave(): void {
+  state = 'playing';
+  wave++;
+  enemySpeed = ENEMY_SPEED_BASE + (wave - 1) * ENEMY_SPEED_INCREMENT;
+
+  spawnWave();
+  showPlayingUI();
 }
 
 function gameOver(): void {
@@ -604,10 +616,10 @@ function gameOver(): void {
 function victory(): void {
   state = 'victory';
   hud.style.display = 'none';
-  wave++;
+  // wave is incremented in nextWave(); show the wave the player just cleared
   gameOverlay.innerHTML = `<h1>Wave ${wave} Complete!</h1><p>Tap to Continue</p>`;
   gameOverlay.style.display = 'flex';
-  startBtn.style.display = 'block';
+  startBtn.style.display = 'none';
   leaderboardBtn.style.display = 'none';
 }
 
@@ -642,7 +654,7 @@ function update(dt: number): void {
   dt = Math.min(dt, MAX_DT);
   elapsed += dt;
 
-  if (state !== 'playing') return;
+  if (state === 'playing') {
 
   // Update invincibility timer
   if (invincibilityTime > 0) {
@@ -695,7 +707,7 @@ function update(dt: number): void {
         0.5 * (1 - progress),
         0.5 * (1 - progress)
       );
-      explosion.mesh.material.color.setHex(
+      (explosion.mesh.material as THREE.MeshBasicMaterial).color.setHex(
         COLORS.explosion + Math.floor((1 - progress) * 0x44)
       );
     }
@@ -703,8 +715,9 @@ function update(dt: number): void {
 
   // Check collisions
   checkCollisions();
+  } // end playing-state update
 
-  // Render
+  // Render every frame so the title / game-over screens show the scene, not black
   renderer.render(scene, camera);
 }
 
@@ -729,11 +742,12 @@ window.addEventListener('pointermove', (e) => {
   playerGlowMesh.position.x = playerX;
 });
 
-window.addEventListener('pointerdown', (e) => {
+window.addEventListener('pointerdown', () => {
   if (state !== 'playing') return;
 
   // Fire bullet from player position
   fireBullet(playerX, playerY + PLAYER_HEIGHT / 2);
+  flashPlayer();
 });
 
 // Keyboard support for debugging on desktop
@@ -742,6 +756,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.code === 'Space') {
     fireBullet(playerX, playerY + PLAYER_HEIGHT / 2);
+    flashPlayer();
   }
   if (e.code === 'ArrowLeft') {
     playerX = THREE.MathUtils.clamp(playerX - PLAYER_SPEED * 0.016, -app.worldWidth / 2 + PLAYER_SIZE / 2, app.worldWidth / 2 - PLAYER_SIZE / 2);
