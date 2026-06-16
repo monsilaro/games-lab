@@ -20,12 +20,14 @@ const BULLET_SIZE = 0.12;
 const ENEMY_ROWS = 5;
 const ENEMY_COLS = 10;
 const ENEMY_SIZE = 0.7;
-const ENEMY_SPACING = 1.0; // between enemies
-const ENEMY_DROP = 0.5; // how far enemies drop when they reach edge
+const ENEMY_GAP = ENEMY_SIZE * 1.35; // center-to-center spacing (cols + rows)
+const ENEMY_DROP = 0.35; // how far enemies drop when they reach an edge
 const ENEMY_SPEED_BASE = 1.5; // units/s
 const ENEMY_SPEED_INCREMENT = 0.2; // speed increase per wave
 const ENEMY_BULLET_SPEED = 4; // units/s
-const ENEMY_BULLET_CHANCE = 0.005; // chance per enemy per frame to shoot
+// Enemy fire is throttled + capped, not per-enemy random (that was ~15 shots/s).
+const MAX_ENEMY_BULLETS = 3; // max enemy shots on screen at once
+const ENEMY_FIRE_INTERVAL = 1.1; // base seconds between enemy shots
 const SHIELD_SIZE = 0.8;
 const SHIELD_COUNT = 4;
 const MAX_DT = 0.05; // clamp delta time
@@ -101,6 +103,11 @@ const { renderer, scene, camera } = app;
 
 const groundY = -WORLD_HEIGHT / 2;
 const ceilingY = WORLD_HEIGHT / 2;
+
+// Fit the invader formation to the real world width. Portrait phones are narrow
+// (worldWidth ≈ 5.5), so a fixed 10-column grid spawned half off-screen and the
+// swarm bounced edge-to-edge and dropped onto the player within seconds.
+const enemyCols = Math.max(4, Math.min(ENEMY_COLS, Math.floor((app.worldWidth * 0.9) / ENEMY_GAP)));
 
 // --- STARFIELD BACKGROUND -----------------------------------------------------
 function createStarfield(): void {
@@ -193,15 +200,19 @@ function fireBullet(x: number, y: number, direction: 'up' | 'down' = 'up'): void
 
 // --- ENEMIES ------------------------------------------------------------------
 const enemyGeometry = new THREE.BoxGeometry(ENEMY_SIZE, ENEMY_SIZE * 0.7, 0.2);
-const enemyMaterial = new THREE.MeshBasicMaterial({ color: COLORS.enemy });
+// Per-row colors so the formation reads as ranks of invaders, not a red blob
+const ENEMY_ROW_COLORS = [0xff4499, 0xff6644, 0xffcc44, 0x44ddff, 0x88ff66];
 const enemies: Enemy[] = [];
 
 function initEnemies(): void {
   for (let row = 0; row < ENEMY_ROWS; row++) {
-    for (let col = 0; col < ENEMY_COLS; col++) {
-      const mesh = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      const x = (col - (ENEMY_COLS - 1) / 2) * ENEMY_SPACING;
-      const y = ceilingY - 2 - row * ENEMY_SPACING;
+    for (let col = 0; col < enemyCols; col++) {
+      const material = new THREE.MeshBasicMaterial({
+        color: ENEMY_ROW_COLORS[row % ENEMY_ROW_COLORS.length],
+      });
+      const mesh = new THREE.Mesh(enemyGeometry, material);
+      const x = (col - (enemyCols - 1) / 2) * ENEMY_GAP;
+      const y = ceilingY - 2 - row * ENEMY_GAP;
 
       mesh.position.set(x, y, 0.1);
       mesh.visible = true;
@@ -224,6 +235,7 @@ let enemySpeed = ENEMY_SPEED_BASE;
 let enemyMoveTimer = 0;
 let enemyMoveInterval = ENEMY_MOVE_INTERVAL;
 let enemyDropNext = false;
+let enemyFireCooldown = 0;
 
 function updateEnemies(dt: number): void {
   enemyMoveTimer += dt;
@@ -281,12 +293,16 @@ function updateEnemies(dt: number): void {
     }
   }
 
-  // Enemy shooting
-  const aliveEnemies = enemies.filter(e => e.alive);
-  if (aliveEnemies.length > 0 && Math.random() < ENEMY_BULLET_CHANCE * aliveEnemies.length * dt * 60) {
+  // Enemy shooting — throttled + capped (a few shots on screen, faster each wave)
+  enemyFireCooldown -= dt;
+  const activeEnemyBullets = bullets.filter((b) => b.alive && b.direction === 'down').length;
+  if (enemyFireCooldown <= 0 && activeEnemyBullets < MAX_ENEMY_BULLETS) {
+    const aliveEnemies = enemies.filter((e) => e.alive);
     const shooter = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
     if (shooter) {
       fireBullet(shooter.x, shooter.y - ENEMY_SIZE / 2, 'down');
+      const interval = Math.max(0.45, ENEMY_FIRE_INTERVAL - (wave - 1) * 0.12);
+      enemyFireCooldown = interval * (0.6 + Math.random() * 0.8);
     }
   }
 }
@@ -539,8 +555,8 @@ function spawnWave(): void {
 
   // Reset enemies
   for (const enemy of enemies) {
-    enemy.x = (enemy.col - (ENEMY_COLS - 1) / 2) * ENEMY_SPACING;
-    enemy.y = ceilingY - 2 - enemy.row * ENEMY_SPACING;
+    enemy.x = (enemy.col - (enemyCols - 1) / 2) * ENEMY_GAP;
+    enemy.y = ceilingY - 2 - enemy.row * ENEMY_GAP;
     enemy.alive = true;
     enemy.mesh.position.set(enemy.x, enemy.y, 0.1);
     enemy.mesh.visible = true;
@@ -565,6 +581,7 @@ function spawnWave(): void {
 
   enemyDirection = 1;
   enemyMoveTimer = 0;
+  enemyFireCooldown = ENEMY_FIRE_INTERVAL;
   invincibilityTime = INVINCIBILITY_TIME;
 }
 
