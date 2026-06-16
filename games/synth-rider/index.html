@@ -10,7 +10,10 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SynthRider 3D" />
-    <meta name="theme-color" content="#0d0e15" />
+    <meta name="theme-color" content="#08090f" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
     <title>SynthRider 3D</title>
     <!-- Google Fonts for retro-cyberpunk styling -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -47,7 +50,7 @@
       }
 
       /* --- HUD ------------------------------------------------------------ */
-      #hud {
+      #synth-rider-hud {
         position: fixed;
         top: calc(env(safe-area-inset-top, 0px) + 20px);
         left: calc(env(safe-area-inset-left, 0px) + 20px);
@@ -82,7 +85,7 @@
       }
 
       /* --- Overlays ----------------------------------------------------------- */
-      .overlay {
+      .synth-rider-overlay {
         position: fixed;
         inset: 0;
         z-index: 10;
@@ -96,7 +99,7 @@
         -webkit-backdrop-filter: blur(10px);
         transition: opacity 0.3s ease;
       }
-      .overlay.hidden {
+      .synth-rider-overlay.hidden {
         opacity: 0;
         pointer-events: none;
       }
@@ -185,7 +188,7 @@
         width: 100%;
       }
 
-      .neon-btn {
+      .synth-rider-neon-btn {
         width: 100%;
         appearance: none;
         border: none;
@@ -267,16 +270,16 @@
   </head>
   <body>
     <!-- Full-screen Canvas -->
-    <canvas id="game-canvas"></canvas>
+    <canvas id="synth-rider-game-canvas"></canvas>
 
     <!-- Score HUD -->
-    <div id="hud">
-      <div class="hud-stat hud-stat-score">SCORE: <span id="score-val">0</span></div>
-      <div class="hud-stat hud-stat-best">BEST: <span id="best-val">0</span></div>
+    <div id="synth-rider-hud">
+      <div class="hud-stat hud-stat-score">SCORE: <span id="synth-rider-hud-score">0</span></div>
+      <div class="hud-stat hud-stat-best">BEST: <span id="synth-rider-hud-best">0</span></div>
     </div>
 
     <!-- Title / Start Overlay -->
-    <div id="title-overlay" class="overlay">
+    <div id="synth-rider-title-overlay" class="synth-rider-overlay">
       <div class="menu-panel">
         <h1 class="neon-title">SynthRider 3D</h1>
         <p class="subtitle">Ride the neon grid. Avoid the obstacles. Dodge at warp speeds!</p>
@@ -300,31 +303,31 @@
         </div>
 
         <div class="btn-group">
-          <button id="start-btn" type="button" class="neon-btn btn-primary">Start Run</button>
-          <button id="menu-leaderboard-btn" type="button" class="neon-btn btn-secondary">🏆 Leaderboard</button>
+          <button id="synth-rider-start-btn" type="button" class="synth-rider-neon-btn btn-primary">Start Run</button>
+          <button id="synth-rider-menu-leaderboard-btn" type="button" class="synth-rider-neon-btn btn-secondary">🏆 Leaderboard</button>
         </div>
       </div>
     </div>
 
     <!-- Game Over Overlay -->
-    <div id="gameover-overlay" class="overlay hidden">
+    <div id="synth-rider-gameover-overlay" class="synth-rider-overlay hidden">
       <div class="menu-panel">
         <h1 class="neon-title" style="background: linear-gradient(135deg, #ff3366, #9d4edd);">Run Over</h1>
         <p class="subtitle" style="color: #ff3366; font-weight: bold; letter-spacing: 1px;">COLLISION DETECTED</p>
         
-        <div class="score-display">SCORE: <span id="final-score-val">0</span></div>
+        <div class="score-display">SCORE: <span id="synth-rider-final-score">0</span></div>
 
         <div class="btn-group">
-          <button id="restart-btn" type="button" class="neon-btn btn-primary">Ride Again</button>
-          <button id="gameover-leaderboard-btn" type="button" class="neon-btn btn-secondary">🏆 Leaderboard</button>
+          <button id="synth-rider-restart-btn" type="button" class="synth-rider-neon-btn btn-primary">Ride Again</button>
+          <button id="synth-rider-gameover-leaderboard-btn" type="button" class="synth-rider-neon-btn btn-secondary">🏆 Leaderboard</button>
         </div>
       </div>
     </div>
 
     <!-- Mobile Touch Overlay Areas for feedback (pure visual) -->
     <div id="mobile-touch-indicators">
-      <div id="touch-left" class="touch-side"></div>
-      <div id="touch-right" class="touch-side touch-side-right"></div>
+      <div id="synth-rider-touch-left" class="touch-side"></div>
+      <div id="synth-rider-touch-right" class="touch-side touch-side-right"></div>
     </div>
 
     <!-- Build Stamp -->

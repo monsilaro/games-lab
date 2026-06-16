@@ -61,22 +61,26 @@ const particles: Particle[] = [];
 const floatingTexts: FloatingText[] = [];
 
 // --- DOM ELEMENTS ------------------------------------------------------------
-const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+const canvas = document.getElementById('snake-game-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
-const menuOverlay = document.getElementById('menuOverlay')!;
-const gameOverOverlay = document.getElementById('gameOverOverlay')!;
-const scoreVal = document.getElementById('scoreVal')!;
-const highVal = document.getElementById('highVal')!;
-const finalScoreVal = document.getElementById('finalScoreVal')!;
+const menuOverlay = document.getElementById('snake-menu-overlay')!;
+const gameOverOverlay = document.getElementById('snake-gameover-overlay')!;
+const scoreVal = document.getElementById('snake-hud-score')!;
+const highVal = document.getElementById('snake-hud-high')!;
+const finalScoreVal = document.getElementById('snake-final-score')!;
 
-const startBtn = document.getElementById('startBtn')!;
-const restartBtn = document.getElementById('restartBtn')!;
-const menuLeaderboardBtn = document.getElementById('menuLeaderboardBtn')!;
-const gameOverLeaderboardBtn = document.getElementById('gameOverLeaderboardBtn')!;
+const startBtn = document.getElementById('snake-start-btn')!;
+const restartBtn = document.getElementById('snake-restart-btn')!;
+const menuLeaderboardBtn = document.getElementById('snake-menu-leaderboard-btn')!;
+const gameOverLeaderboardBtn = document.getElementById('snake-gameover-leaderboard-btn')!;
 
 // --- INITIALIZE UI SCORE -----------------------------------------------------
 highVal.textContent = String(highScore);
+
+// Build stamp (parity with other games)
+const buildStamp = document.getElementById('snake-build-stamp');
+if (buildStamp) buildStamp.textContent = __BUILD_INFO__;
 
 // --- LOCAL STORAGE HELPERS ---------------------------------------------------
 function loadHighScore(): number {
@@ -214,9 +218,9 @@ function triggerGameOver(): void {
   spawnDeathParticles();
   shakeIntensity = 18; // Heavy impact camera shake on crash
 
-  const container = document.getElementById('gameContainer');
+  const container = document.getElementById('snake-game-container');
   if (container) {
-    container.classList.add('game-over-glow');
+    container.classList.add('snake-game-over-glow');
   }
 
   let isNewBest = false;
@@ -502,6 +506,17 @@ function update(dt: number): void {
 }
 
 // --- INPUT LISTENERS ---------------------------------------------------------
+// Single source of truth for turning the snake (shared by keyboard + swipe).
+function queueDir(nextDir: Position): void {
+  if (state !== 'PLAYING') return;
+  // Compare against the last queued turn, or the head direction if queue empty
+  const prev = inputQueue.length > 0 ? inputQueue[inputQueue.length - 1]! : lastDir;
+  // Block 180° instant suicide reversals and no-op repeats
+  if (nextDir.x === -prev.x && nextDir.y === -prev.y) return;
+  if (nextDir.x === prev.x && nextDir.y === prev.y) return;
+  inputQueue.push(nextDir);
+}
+
 window.addEventListener('keydown', (e) => {
   // Prevent scrolling
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key) || e.code === 'Space') {
@@ -517,8 +532,8 @@ window.addEventListener('keydown', (e) => {
       initGame();
     } else if (state === 'GAMEOVER') {
       gameOverOverlay.classList.remove('active');
-      const container = document.getElementById('gameContainer')!;
-      container.classList.remove('game-over-glow');
+      const container = document.getElementById('snake-game-container')!;
+      container.classList.remove('snake-game-over-glow');
       initGame();
     }
     return;
@@ -538,15 +553,45 @@ window.addEventListener('keydown', (e) => {
   }
 
   if (nextDir) {
-    // Look at last direction queued, or head direction if queue empty
-    const prev = inputQueue.length > 0 ? inputQueue[inputQueue.length - 1]! : lastDir;
-    // Prevent 180 degree instant suicide reversals
-    if (nextDir.x !== -prev.x || nextDir.y !== -prev.y) {
-      if (nextDir.x !== prev.x || nextDir.y !== prev.y) {
-        inputQueue.push(nextDir);
-      }
-    }
+    queueDir(nextDir);
   }
+});
+
+// --- TOUCH INPUT (mobile-first): swipe to turn, short tap to pause -----------
+const SNAKE_SWIPE_THRESHOLD = 24; // px — below this a gesture counts as a tap
+let snakeTouchStart: { x: number; y: number } | null = null;
+
+canvas.addEventListener('pointerdown', (e) => {
+  snakeTouchStart = { x: e.clientX, y: e.clientY };
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  if (!snakeTouchStart) return;
+  const dx = e.clientX - snakeTouchStart.x;
+  const dy = e.clientY - snakeTouchStart.y;
+  snakeTouchStart = null;
+
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+
+  // Short tap → pause toggle (touch only; mouse clicks shouldn't pause on desktop)
+  if (Math.max(absX, absY) < SNAKE_SWIPE_THRESHOLD) {
+    if (state === 'PLAYING' && e.pointerType !== 'mouse') {
+      isPaused = !isPaused;
+    }
+    return;
+  }
+
+  // Swipe → turn along the dominant axis
+  if (absX > absY) {
+    queueDir({ x: dx > 0 ? 1 : -1, y: 0 });
+  } else {
+    queueDir({ x: 0, y: dy > 0 ? 1 : -1 });
+  }
+});
+
+canvas.addEventListener('pointercancel', () => {
+  snakeTouchStart = null;
 });
 
 // --- GLOBAL LEADERBOARD LOGIC ------------------------------------------------
@@ -572,8 +617,8 @@ startBtn.addEventListener('click', () => {
 
 restartBtn.addEventListener('click', () => {
   gameOverOverlay.classList.remove('active');
-  const container = document.getElementById('gameContainer')!;
-  container.classList.remove('game-over-glow');
+  const container = document.getElementById('snake-game-container')!;
+  container.classList.remove('snake-game-over-glow');
   initGame();
 });
 

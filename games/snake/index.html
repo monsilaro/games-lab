@@ -2,7 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Neon Snake" />
+    <meta name="theme-color" content="#0d0e15" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
     <title>Neon Snake</title>
     <!-- Google Fonts for premium typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -34,9 +42,12 @@
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        overscroll-behavior: none;
         position: relative;
         -webkit-user-select: none;
         user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
       }
 
       /* Cyberpunk background grid */
@@ -135,7 +146,7 @@
         aspect-ratio: 1/1;
       }
 
-      .container.game-over-glow {
+      .container.snake-game-over-glow {
         border-color: rgba(255, 0, 127, 0.5);
         box-shadow: 
           0 0 30px rgba(255, 0, 127, 0.25),
@@ -148,6 +159,7 @@
         border-radius: 12px;
         width: 100%;
         height: 100%;
+        touch-action: none;
       }
 
       .instructions {
@@ -167,7 +179,7 @@
       }
 
       /* Game state overlays */
-      .overlay {
+      .snake-overlay {
         position: absolute;
         inset: 4px;
         background: rgba(10, 11, 18, 0.9);
@@ -186,12 +198,12 @@
         backdrop-filter: blur(4px);
       }
 
-      .overlay.active {
+      .snake-overlay.active {
         opacity: 1;
         pointer-events: auto;
       }
 
-      .overlay h2 {
+      .snake-overlay h2 {
         font-size: 2.2rem;
         font-weight: 900;
         text-transform: uppercase;
@@ -199,7 +211,7 @@
         margin-bottom: 4px;
       }
 
-      .overlay p {
+      .snake-overlay p {
         font-size: 1rem;
         color: #a1a1aa;
         max-width: 320px;
@@ -256,6 +268,17 @@
         align-items: center;
       }
 
+      #snake-build-stamp {
+        position: fixed;
+        z-index: 5;
+        right: calc(env(safe-area-inset-right, 0px) + 10px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+        font-size: 10px;
+        font-family: 'Outfit', monospace;
+        color: rgba(113, 113, 122, 0.6);
+        pointer-events: none;
+      }
+
       @keyframes neonPulse {
         from {
           text-shadow: 
@@ -281,44 +304,46 @@
         <div class="scoreboard">
           <div class="score-box">
             <span>Score:</span>
-            <span id="scoreVal" class="val">0</span>
+            <span id="snake-hud-score" class="val">0</span>
           </div>
           <div class="score-box">
             <span>High:</span>
-            <span id="highVal" class="high-val">0</span>
+            <span id="snake-hud-high" class="high-val">0</span>
           </div>
         </div>
       </div>
 
-      <div class="container" id="gameContainer">
-        <canvas id="gameCanvas" width="600" height="600"></canvas>
-        
+      <div class="container" id="snake-game-container">
+        <canvas id="snake-game-canvas" width="600" height="600"></canvas>
+
         <!-- Main menu overlay -->
-        <div class="overlay active" id="menuOverlay">
+        <div class="snake-overlay active" id="snake-menu-overlay">
           <h2 style="color: var(--neon-cyan); text-shadow: 0 0 10px var(--neon-cyan);">Cyber Snake</h2>
           <p>Dodge the walls and your own tail. Eat code spheres to grow.</p>
           <div class="btn-group">
-            <button class="btn" id="startBtn">Initialize</button>
-            <button class="btn btn-pink" id="menuLeaderboardBtn">🏆 Leaderboard</button>
+            <button class="btn" id="snake-start-btn">Initialize</button>
+            <button class="btn btn-pink" id="snake-menu-leaderboard-btn">🏆 Leaderboard</button>
           </div>
         </div>
 
         <!-- Game Over overlay -->
-        <div class="overlay" id="gameOverOverlay">
+        <div class="snake-overlay" id="snake-gameover-overlay">
           <h2 style="color: var(--neon-pink); text-shadow: 0 0 10px var(--neon-pink);">System Failure</h2>
-          <p>Snake loop collapsed.<br>Final Score: <span id="finalScoreVal" style="color: var(--neon-cyan); font-weight: 800;">0</span></p>
+          <p>Snake loop collapsed.<br>Final Score: <span id="snake-final-score" style="color: var(--neon-cyan); font-weight: 800;">0</span></p>
           <div class="btn-group">
-            <button class="btn" id="restartBtn">Reboot</button>
-            <button class="btn btn-pink" id="gameOverLeaderboardBtn">🏆 Leaderboard</button>
+            <button class="btn" id="snake-restart-btn">Reboot</button>
+            <button class="btn btn-pink" id="snake-gameover-leaderboard-btn">🏆 Leaderboard</button>
           </div>
         </div>
       </div>
 
       <p class="instructions">
-        Use <span>WASD</span> or <span>Arrows</span> to control direction.<br>
-        Press <span>Space</span> to Pause / Resume.
+        <span>Swipe</span> to steer · <span>Tap</span> to pause.<br>
+        Desktop: <span>WASD</span>/<span>Arrows</span> · <span>Space</span> to pause.
       </p>
     </div>
+
+    <div id="snake-build-stamp"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

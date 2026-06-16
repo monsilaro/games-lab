@@ -45,17 +45,17 @@ try {
 }
 
 // --- DOM References -------------------------------------------------------
-const titleOverlay = document.getElementById('title-overlay') as HTMLDivElement;
-const gameoverOverlay = document.getElementById('gameover-overlay') as HTMLDivElement;
-const hud = document.getElementById('hud') as HTMLDivElement;
-const scoreVal = document.getElementById('score-val') as HTMLSpanElement;
-const bestVal = document.getElementById('best-val') as HTMLSpanElement;
-const finalScoreVal = document.getElementById('final-score-val') as HTMLSpanElement;
+const titleOverlay = document.getElementById('synth-rider-title-overlay') as HTMLDivElement;
+const gameoverOverlay = document.getElementById('synth-rider-gameover-overlay') as HTMLDivElement;
+const hud = document.getElementById('synth-rider-hud') as HTMLDivElement;
+const scoreVal = document.getElementById('synth-rider-hud-score') as HTMLSpanElement;
+const bestVal = document.getElementById('synth-rider-hud-best') as HTMLSpanElement;
+const finalScoreVal = document.getElementById('synth-rider-final-score') as HTMLSpanElement;
 
-const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
-const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
-const menuLeaderboardBtn = document.getElementById('menu-leaderboard-btn') as HTMLButtonElement;
-const gameoverLeaderboardBtn = document.getElementById('gameover-leaderboard-btn') as HTMLButtonElement;
+const startBtn = document.getElementById('synth-rider-start-btn') as HTMLButtonElement;
+const restartBtn = document.getElementById('synth-rider-restart-btn') as HTMLButtonElement;
+const menuLeaderboardBtn = document.getElementById('synth-rider-menu-leaderboard-btn') as HTMLButtonElement;
+const gameoverLeaderboardBtn = document.getElementById('synth-rider-gameover-leaderboard-btn') as HTMLButtonElement;
 const stamp = document.getElementById('synth-rider-build-stamp') as HTMLDivElement;
 
 if (stamp) {
@@ -133,9 +133,24 @@ function getWaveHeight(x: number, z: number, time: number): number {
   return baseHeight * smoothFactor;
 }
 
+// Recompute every grid vertex height on the CPU. ~3700 verts, so only call this
+// while playing (the menu/gameover grid keeps its last seeded frame — no per-frame cost).
+function updateGridWave(time: number): void {
+  const posAttr = gridGeo.attributes.position;
+  if (!posAttr) return;
+  for (let i = 0; i < posAttr.count; i++) {
+    const x = posAttr.getX(i);
+    const z = posAttr.getZ(i);
+    // Align wave to world Z so there is no visual jump when resetting mesh Z coordinate
+    const worldZ = z - gridOffset;
+    posAttr.setY(i, getWaveHeight(x, worldZ, time));
+  }
+  posAttr.needsUpdate = true;
+}
+
 // --- Build Scene -----------------------------------------------------------
 function initEngine(): void {
-  const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+  const canvas = document.getElementById('synth-rider-game-canvas') as HTMLCanvasElement;
   renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -284,6 +299,9 @@ function initEngine(): void {
 
   playerGroup.position.set(0, 0.5, 0);
   scene.add(playerGroup);
+
+  // Seed the idle grid with one wave frame so the menu isn't a flat plane
+  updateGridWave(0);
 }
 
 // --- Obstacle Factory ------------------------------------------------------
@@ -502,6 +520,7 @@ function handleRight(): void {
 
 // Keyboard
 window.addEventListener('keydown', (e) => {
+  // Don't steer the ship while the leaderboard modal is open
   if (document.querySelector('.gl-leaderboard-backdrop')) {
     return;
   }
@@ -518,7 +537,7 @@ window.addEventListener('pointerdown', (e) => {
 
   // Block touch switches if tapping UI buttons or overlays
   const target = e.target as HTMLElement;
-  if (target.closest('.neon-btn') || target.closest('.gl-leaderboard-backdrop')) {
+  if (target.closest('.synth-rider-neon-btn') || target.closest('.gl-leaderboard-backdrop')) {
     return;
   }
 
@@ -531,7 +550,7 @@ window.addEventListener('pointerdown', (e) => {
 });
 
 function showTouchFeedback(side: 'left' | 'right'): void {
-  const el = document.getElementById(side === 'left' ? 'touch-left' : 'touch-right');
+  const el = document.getElementById(side === 'left' ? 'synth-rider-touch-left' : 'synth-rider-touch-right');
   if (el) {
     el.classList.add('active');
     setTimeout(() => el.classList.remove('active'), 150);
@@ -591,18 +610,9 @@ function gameLoop(now: number): void {
     gridWireMesh.position.z = gridMesh.position.z;
   }
 
-  // Update vertex Y heights in CPU
-  const posAttr = gridGeo.attributes.position;
-  if (posAttr) {
-    for (let i = 0; i < posAttr.count; i++) {
-      const x = posAttr.getX(i);
-      const z = posAttr.getZ(i);
-      // Align wave to world Z so there is no visual jump when resetting mesh Z coordinate
-      const worldZ = z - gridOffset;
-      const y = getWaveHeight(x, worldZ, time);
-      posAttr.setY(i, y);
-    }
-    posAttr.needsUpdate = true;
+  // Animate the grid only while playing; menu/gameover keep the seeded frame
+  if (state === 'playing') {
+    updateGridWave(time);
   }
 
   // 2. Play mode logic
@@ -623,8 +633,8 @@ function gameLoop(now: number): void {
     // Slight yaw pivot
     playerGroup.rotation.y = (targetX - playerGroup.position.x) * 0.08;
 
-    // Animate thruster scale pulse
-    const thrusterScale = 1.0 + Math.sin(time * 60) * 0.25;
+    // Animate thruster scale pulse (calm ~1.3 Hz; time*60 aliased at frame rate)
+    const thrusterScale = 1.0 + Math.sin(time * 8) * 0.25;
     thrusterMesh.scale.set(1, 1, thrusterScale);
 
     // Spawn Obstacles
