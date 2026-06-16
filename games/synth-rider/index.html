@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SynthRider 3D" />
+    <meta name="theme-color" content="#0d0e15" />
+    <title>SynthRider 3D</title>
+    <!-- Google Fonts for retro-cyberpunk styling -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Outfit:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #08090f;
+        color: #e8edf2;
+        font-family: 'Outfit', -apple-system, system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        touch-action: none;
+        z-index: 0;
+      }
+
+      /* --- HUD ------------------------------------------------------------ */
+      #hud {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 20px);
+        left: calc(env(safe-area-inset-left, 0px) + 20px);
+        right: calc(env(safe-area-inset-right, 0px) + 20px);
+        display: none;
+        justify-content: space-between;
+        pointer-events: none;
+        z-index: 5;
+        font-family: 'Orbitron', sans-serif;
+      }
+      .hud-stat {
+        background: rgba(10, 17, 40, 0.7);
+        border: 1px solid rgba(202, 240, 248, 0.15);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        padding: 10px 18px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 800;
+        color: #caf0f8;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .hud-stat span {
+        color: #ff9f1c; /* Ember color for active score */
+        font-variant-numeric: tabular-nums;
+      }
+      .hud-stat-best span {
+        color: #ffd166; /* Ember light for high score */
+      }
+
+      /* --- Overlays ----------------------------------------------------------- */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(8, 9, 15, 0.75);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transition: opacity 0.3s ease;
+      }
+      .overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .menu-panel {
+        background: rgba(28, 37, 65, 0.55);
+        border: 1px solid rgba(202, 240, 248, 0.15);
+        border-radius: 24px;
+        padding: 36px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6),
+                    0 0 50px rgba(255, 159, 28, 0.08);
+        max-width: 420px;
+        width: 100%;
+        text-align: center;
+        transform: translateY(0);
+        animation: panelSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes panelSlideIn {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .neon-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 38px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #ff9f1c, #ff3366);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 30px rgba(255, 51, 102, 0.25);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        font-size: 15px;
+        color: rgba(232, 237, 242, 0.7);
+        line-height: 1.5;
+        margin-bottom: 6px;
+      }
+
+      .score-display {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 28px;
+        font-weight: 800;
+        color: #ff9f1c;
+        text-shadow: 0 0 15px rgba(255, 159, 28, 0.4);
+        margin: 8px 0;
+      }
+
+      .controls-guide {
+        background: rgba(10, 17, 40, 0.5);
+        border: 1px solid rgba(202, 240, 248, 0.1);
+        border-radius: 12px;
+        padding: 14px 18px;
+        width: 100%;
+        font-size: 13px;
+        color: #caf0f8;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .controls-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .key-cap {
+        background: rgba(58, 80, 107, 0.6);
+        border: 1px solid rgba(202, 240, 248, 0.3);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+      }
+
+      .neon-btn {
+        width: 100%;
+        appearance: none;
+        border: none;
+        border-radius: 12px;
+        padding: 14px 20px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 16px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #ff9f1c, #ffd166);
+        color: #0a1128;
+        box-shadow: 0 6px 20px rgba(255, 159, 28, 0.35);
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 159, 28, 0.5);
+      }
+      .btn-primary:active {
+        transform: translateY(1px);
+      }
+
+      .btn-secondary {
+        background: linear-gradient(135deg, #2ec4b6, #caf0f8);
+        color: #0a1128;
+        box-shadow: 0 6px 20px rgba(46, 196, 182, 0.25);
+      }
+      .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(46, 196, 182, 0.4);
+      }
+      .btn-secondary:active {
+        transform: translateY(1px);
+      }
+
+      /* Mobile visual layout for touch lanes */
+      #mobile-touch-indicators {
+        position: fixed;
+        inset: 0;
+        display: none;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .touch-side {
+        width: 50%;
+        height: 100%;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        background: linear-gradient(to right, rgba(255, 159, 28, 0.05), transparent);
+      }
+      .touch-side-right {
+        background: linear-gradient(to left, rgba(255, 159, 28, 0.05), transparent);
+      }
+      .touch-side.active {
+        opacity: 1;
+      }
+
+      /* --- Build Stamp --------------------------------------------------- */
+      #synth-rider-build-stamp {
+        position: fixed;
+        z-index: 5;
+        right: calc(env(safe-area-inset-right, 0px) + 12px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+        font-size: 10px;
+        font-family: 'Orbitron', monospace;
+        color: rgba(232, 237, 242, 0.35);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Full-screen Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Score HUD -->
+    <div id="hud">
+      <div class="hud-stat hud-stat-score">SCORE: <span id="score-val">0</span></div>
+      <div class="hud-stat hud-stat-best">BEST: <span id="best-val">0</span></div>
+    </div>
+
+    <!-- Title / Start Overlay -->
+    <div id="title-overlay" class="overlay">
+      <div class="menu-panel">
+        <h1 class="neon-title">SynthRider 3D</h1>
+        <p class="subtitle">Ride the neon grid. Avoid the obstacles. Dodge at warp speeds!</p>
+        
+        <div class="controls-guide">
+          <div class="controls-row">
+            <span>Move Left</span>
+            <div>
+              <span class="key-cap">A</span> or <span class="key-cap">←</span>
+            </div>
+          </div>
+          <div class="controls-row">
+            <span>Move Right</span>
+            <div>
+              <span class="key-cap">D</span> or <span class="key-cap">→</span>
+            </div>
+          </div>
+          <div class="controls-row" style="margin-top: 4px; font-size: 11px; opacity: 0.8; justify-content: center;">
+            <span>📱 Mobile: Tap Left/Right halves of screen</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button id="start-btn" type="button" class="neon-btn btn-primary">Start Run</button>
+          <button id="menu-leaderboard-btn" type="button" class="neon-btn btn-secondary">🏆 Leaderboard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameover-overlay" class="overlay hidden">
+      <div class="menu-panel">
+        <h1 class="neon-title" style="background: linear-gradient(135deg, #ff3366, #9d4edd);">Run Over</h1>
+        <p class="subtitle" style="color: #ff3366; font-weight: bold; letter-spacing: 1px;">COLLISION DETECTED</p>
+        
+        <div class="score-display">SCORE: <span id="final-score-val">0</span></div>
+
+        <div class="btn-group">
+          <button id="restart-btn" type="button" class="neon-btn btn-primary">Ride Again</button>
+          <button id="gameover-leaderboard-btn" type="button" class="neon-btn btn-secondary">🏆 Leaderboard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Touch Overlay Areas for feedback (pure visual) -->
+    <div id="mobile-touch-indicators">
+      <div id="touch-left" class="touch-side"></div>
+      <div id="touch-right" class="touch-side touch-side-right"></div>
+    </div>
+
+    <!-- Build Stamp -->
+    <div id="synth-rider-build-stamp"></div>
+
+    <!-- Main Entry Script -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
