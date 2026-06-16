@@ -24,6 +24,7 @@ From prompt to playable build on device in about a minute.
 |Arena |Survivors-like under the aurora: joystick, auto-fire, waves, upgrades|[▶️](https://monsilaro.github.io/games-lab/arena/)|
 |Slingshot|Angry-Birds-like: drag to aim, topple procedural towers, save your shots|[▶️](https://monsilaro.github.io/games-lab/slingshot/)|
 |Veillée|Solo score-attack auto-battler of Québécois folklore — draft heroes, place them, auto-fight 10 scripted levels (hero gallery at `?forge=1`)|[▶️](https://monsilaro.github.io/games-lab/veillee/)|
+|Space Invaders|Classic arcade shooter — drag to move, tap to fire, defeat waves of aliens|[▶️](https://monsilaro.github.io/games-lab/space-invaders/)|
 
 *(New prototypes appear on the arcade index automatically.)*
 

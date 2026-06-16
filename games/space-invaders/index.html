@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Space Invaders" />
+    <meta name="theme-color" content="#0a0a1a" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
+    <title>Space Invaders</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #0a0a1a;
+        color: #f4f4f6;
+        font-family: -apple-system, system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        touch-action: none;
+        z-index: 0;
+      }
+      #space-invaders-hud {
+        position: fixed;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        left: calc(env(safe-area-inset-left, 0px) + 14px);
+        right: calc(env(safe-area-inset-right, 0px) + 14px);
+        display: none;
+        flex-direction: row;
+        justify-content: space-between;
+        pointer-events: none;
+      }
+      #space-invaders-score {
+        font-size: 24px;
+        font-weight: 800;
+        color: #00ff88;
+        text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+      }
+      #space-invaders-lives {
+        font-size: 24px;
+        font-weight: 800;
+        color: #ff4444;
+      }
+      #space-invaders-game-overlay {
+        position: fixed;
+        z-index: 20;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px
+          calc(env(safe-area-inset-bottom, 0px) + 16px);
+        text-align: center;
+        background: rgba(10, 10, 26, 0.75);
+        pointer-events: none;
+      }
+      #space-invaders-game-overlay h1 {
+        font-size: 42px;
+        font-weight: 800;
+        color: #00ff88;
+        text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+      }
+      #space-invaders-game-overlay p {
+        font-size: 18px;
+        font-weight: 600;
+        color: rgba(244, 244, 246, 0.85);
+      }
+      #space-invaders-build-stamp {
+        position: fixed;
+        z-index: 10;
+        right: calc(env(safe-area-inset-right, 0px) + 8px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+        font-size: 10px;
+        color: rgba(244, 244, 246, 0.4);
+        pointer-events: none;
+      }
+      #space-invaders-start-btn {
+        position: fixed;
+        z-index: 15;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
+        display: none;
+        pointer-events: auto;
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        padding: 14px 32px;
+        border-radius: 12px;
+        font-family: inherit;
+        font-size: 18px;
+        font-weight: 800;
+        color: #0a0a1a;
+        background: #00ff88;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+      }
+      #space-invaders-start-btn:active {
+        transform: translate(-50%, 2px);
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+      }
+      /* Leaderboard button */
+      #space-invaders-leaderboard-btn {
+        position: fixed;
+        z-index: 30;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+        display: none;
+        pointer-events: auto;
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        padding: 12px 22px;
+        border-radius: 10px;
+        font-family: inherit;
+        font-size: 17px;
+        font-weight: 800;
+        color: #0a0a1a;
+        background: #ffd166;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="space-invaders-hud">
+      <span id="space-invaders-score">0</span>
+      <span id="space-invaders-lives">❤️❤️❤️</span>
+    </div>
+    <div id="space-invaders-build-stamp"></div>
+    <div id="space-invaders-game-overlay">
+      <h1>Space Invaders</h1>
+      <p>Tap to Start</p>
+    </div>
+    <button id="space-invaders-start-btn" type="button">Start Game</button>
+    <button id="space-invaders-leaderboard-btn" type="button">🏆 Classement</button>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

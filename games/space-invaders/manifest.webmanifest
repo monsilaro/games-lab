@@ -1,0 +1,16 @@
+{
+  "name": "Space Invaders",
+  "short_name": "Space Invaders",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0a0a1a",
+  "theme_color": "#0a0a1a",
+  "description": "Classic Space Invaders game",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
