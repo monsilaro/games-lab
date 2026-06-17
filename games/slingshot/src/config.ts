@@ -247,4 +247,4 @@ export const STAR3_SPARE = 2; // spare shots on clear → 3 stars
 export const STAR2_SPARE = 1; // → 2 stars (else 1)
 
 // --- audio (audio.ts) -----------------------------------------------------------
-export const SFX_MASTER_GAIN = 0.36; // 0..1 master volume for the paper SFX
+export const SFX_MASTER_GAIN = 0.85; // 0..1 master volume; the saturator+limiter chain runs hot without clipping
