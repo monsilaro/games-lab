@@ -12,8 +12,10 @@ declare const __BUILD_INFO__: string; // injected by vite.config.ts `define`
 
 // --- TUNING ----------------------------------------------------------------
 const WORLD_HEIGHT = 12; // world units visible vertically
-const PLAYER_SPEED = 6; // units/s
-const PLAYER_SIZE = 0.8; // player ship width
+const PLAYER_SPEED = 7; // units/s for keyboard hold-to-steer
+const PLAYER_LERP = 16; // how stiffly the ship chases the drag target
+const PLAYER_FIRE_INTERVAL = 0.32; // s between auto-fire shots (capped rapid fire)
+const PLAYER_SIZE = 0.8; // player ship collision width
 const PLAYER_HEIGHT = 0.4;
 const BULLET_SPEED = 12; // units/s
 const BULLET_SIZE = 0.12;
@@ -30,12 +32,14 @@ const MAX_ENEMY_BULLETS = 3; // max enemy shots on screen at once
 const ENEMY_FIRE_INTERVAL = 1.1; // base seconds between enemy shots
 const SHIELD_SIZE = 0.8;
 const SHIELD_COUNT = 4;
+const SHIELD_HEALTH = 4; // hits a bunker takes; each hit erodes it one frame
 const MAX_DT = 0.05; // clamp delta time
 const INITIAL_LIVES = 3;
 
 // visuals
 const STAR_COUNT = 150;
 const STAR_LAYER_HEIGHT = 5;
+const PIXEL_CELL = 8; // px per sprite cell when rasterising the pixel art
 
 // timing
 const ENEMY_MOVE_INTERVAL = 0.5; // seconds between enemy movements
@@ -44,20 +48,178 @@ const INVINCIBILITY_TIME = 2.0; // seconds after game start
 // --- COLORS -----------------------------------------------------------------
 const COLORS = {
   background: 0x0a0a1a,
-  stars: 0x444466,
-  player: 0x00ff88,
-  playerGlow: 0x008844,
-  bullet: 0x00ff88,
-  enemy: 0xff4444,
-  enemyGlow: 0x882222,
-  enemyBullet: 0xff6666,
-  shield: 0x4488ff,
-  shieldGlow: 0x224488,
-  explosion: 0xffaa44,
-  explosionGlow: 0xff6600,
-  text: 0xffffff,
-  textGlow: 0x00ff88,
+  player: 0x54ff8a,
+  playerGlow: 0x1f9c4f,
+  playerBullet: 0xeafff0,
+  enemyBullet: 0xff5cc8,
+  ground: 0x2bd66b,
 };
+// Per-tier invader colours — a cyan→green→lime CRT gradient.
+const TIER_COLORS = ['#5cf2ff', '#5dff8f', '#c6ff4d'];
+const BUNKER_COLOR = '#46d17a';
+const EXPLOSION_ENEMY_COLOR = '#fff2a6';
+const EXPLOSION_PLAYER_COLOR = '#ff5cc8';
+
+// --- PIXEL-ART SPRITES -------------------------------------------------------
+// Classic Space Invaders silhouettes, hand-drawn as pixel grids ('X' = filled).
+// Rasterised at runtime to a CanvasTexture (NearestFilter) and mapped onto an
+// unlit plane — zero asset files, still inside the flat-MeshBasicMaterial rule.
+const PLAYER_ART = [
+  '     XX     ',
+  '     XX     ',
+  '    XXXX    ',
+  '   XXXXXX   ',
+  ' XXXXXXXXXX ',
+  'XXXXXXXXXXXX',
+  'XXXXXXXXXXXX',
+];
+
+// tier 0 — "squid" (top row)
+const SQUID_A = [
+  '    XXXX    ',
+  '   XXXXXX   ',
+  '  XXXXXXXX  ',
+  '  XX XX XX  ',
+  '  XXXXXXXX  ',
+  '   X XX X   ',
+  '  X X  X X  ',
+  '   X    X   ',
+];
+const SQUID_B = [
+  '    XXXX    ',
+  '   XXXXXX   ',
+  '  XXXXXXXX  ',
+  '  XX XX XX  ',
+  '  XXXXXXXX  ',
+  '   XX  XX   ',
+  '  X  XX  X  ',
+  ' X        X ',
+];
+
+// tier 1 — "crab" (middle rows)
+const CRAB_A = [
+  '  X      X  ',
+  '   X    X   ',
+  '  XXXXXXXX  ',
+  ' XX XXXX XX ',
+  'XXXXXXXXXXXX',
+  'X XXXXXXXX X',
+  'X X      X X',
+  '   XX  XX   ',
+];
+const CRAB_B = [
+  '  X      X  ',
+  '   X    X   ',
+  '  XXXXXXXX  ',
+  ' XX XXXX XX ',
+  'XXXXXXXXXXXX',
+  'X XXXXXXXX X',
+  '  X      X  ',
+  ' X        X ',
+];
+
+// tier 2 — "octopus" (bottom rows)
+const OCTO_A = [
+  '    XXXX    ',
+  '  XXXXXXXX  ',
+  ' XXXXXXXXXX ',
+  'XXX  XX  XXX',
+  'XXXXXXXXXXXX',
+  '  XXXXXXXX  ',
+  '  XX    XX  ',
+  ' XX      XX ',
+];
+const OCTO_B = [
+  '    XXXX    ',
+  '  XXXXXXXX  ',
+  ' XXXXXXXXXX ',
+  'XXX  XX  XXX',
+  'XXXXXXXXXXXX',
+  '  XXXXXXXX  ',
+  ' X  XXXX  X ',
+  'X  X    X  X',
+];
+
+// [tier][frame] — frame toggles each march step for the iconic wiggle.
+const INVADER_ART: string[][][] = [
+  [SQUID_A, SQUID_B],
+  [CRAB_A, CRAB_B],
+  [OCTO_A, OCTO_B],
+];
+
+const BUNKER_ART = [
+  '   XXXXXX   ',
+  '  XXXXXXXX  ',
+  ' XXXXXXXXXX ',
+  'XXXXXXXXXXXX',
+  'XXXX    XXXX',
+  'XXX      XXX',
+];
+
+const SPLAT_ART = [
+  'X  X    X  X',
+  ' X  X  X  X ',
+  '   X XX X   ',
+  'XX XXXXXX XX',
+  '   X XX X   ',
+  ' X  X  X  X ',
+  'X  X    X  X',
+];
+
+/** Rasterise a pixel grid into a crisp CanvasTexture. */
+function makePixelTexture(rows: string[], color: string, cell = PIXEL_CELL): THREE.CanvasTexture {
+  const cols = rows[0]?.length ?? 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * cell;
+  canvas.height = rows.length * cell;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = color;
+    for (let y = 0; y < rows.length; y++) {
+      const row = rows[y];
+      if (!row) continue;
+      for (let x = 0; x < cols; x++) {
+        const c = row[x];
+        if (c && c !== ' ' && c !== '.') ctx.fillRect(x * cell, y * cell, cell, cell);
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Bunker texture eroded by `damage` (0 = pristine): scatter-clears filled cells. */
+function makeBunkerTexture(damage: number, cell = PIXEL_CELL): THREE.CanvasTexture {
+  const cols = BUNKER_ART[0]?.length ?? 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * cell;
+  canvas.height = BUNKER_ART.length * cell;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = BUNKER_COLOR;
+    for (let y = 0; y < BUNKER_ART.length; y++) {
+      const row = BUNKER_ART[y];
+      if (!row) continue;
+      for (let x = 0; x < cols; x++) {
+        const c = row[x];
+        if (!c || c === ' ' || c === '.') continue;
+        // deterministic scatter so erosion looks chipped, not uniform
+        if (((x * 5 + y * 3) % 11) < damage * 3) continue;
+        ctx.fillRect(x * cell, y * cell, cell, cell);
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
 
 // --- TYPE DEFINITIONS -------------------------------------------------------
 type GameState = 'ready' | 'playing' | 'gameover' | 'victory';
@@ -68,6 +230,7 @@ interface Enemy {
   y: number;
   col: number;
   row: number;
+  tier: number;
   alive: boolean;
 }
 
@@ -109,6 +272,13 @@ const ceilingY = WORLD_HEIGHT / 2;
 // swarm bounced edge-to-edge and dropped onto the player within seconds.
 const enemyCols = Math.max(4, Math.min(ENEMY_COLS, Math.floor((app.worldWidth * 0.9) / ENEMY_GAP)));
 
+// Row → tier: top row = squid, next two = crab, bottom two = octopus.
+function tierForRow(row: number): number {
+  if (row === 0) return 0;
+  if (row <= 2) return 1;
+  return 2;
+}
+
 // --- STARFIELD BACKGROUND -----------------------------------------------------
 function createStarfield(): void {
   const positions: number[] = [];
@@ -140,21 +310,39 @@ function createStarfield(): void {
   scene.add(stars);
 }
 
+// Classic arcade baseline the bunkers and ship sit on.
+function createGroundLine(): void {
+  const geo = new THREE.PlaneGeometry(app.worldWidth * 2, 0.06);
+  const mat = new THREE.MeshBasicMaterial({ color: COLORS.ground, transparent: true, opacity: 0.55 });
+  const line = new THREE.Mesh(geo, mat);
+  line.position.set(0, groundY + 0.45, 0.05);
+  scene.add(line);
+}
+
 // --- PLAYER ------------------------------------------------------------------
 let playerX = 0;
 let playerY = groundY + 1.5;
-const playerGeometry = new THREE.BoxGeometry(PLAYER_SIZE, PLAYER_HEIGHT, 0.2);
-const playerMaterial = new THREE.MeshBasicMaterial({ color: COLORS.player });
+let targetX = 0; // drag / keyboard target the ship lerps toward
+
+// White sprite so material.color can tint the ship + its glow halo.
+const playerTexture = makePixelTexture(PLAYER_ART, '#ffffff');
+const playerGeometry = new THREE.PlaneGeometry(0.9, 0.55);
+const playerMaterial = new THREE.MeshBasicMaterial({
+  map: playerTexture,
+  transparent: true,
+  color: COLORS.player,
+});
 const playerMesh = new THREE.Mesh(playerGeometry, playerMaterial);
 playerMesh.position.set(playerX, playerY, 0.1);
 scene.add(playerMesh);
 
-// Player glow effect
-const playerGlowGeometry = new THREE.BoxGeometry(PLAYER_SIZE * 1.3, PLAYER_HEIGHT * 1.3, 0.3);
+// Player glow halo — same sprite, larger, dim green, behind the ship.
+const playerGlowGeometry = new THREE.PlaneGeometry(0.9 * 1.35, 0.55 * 1.35);
 const playerGlowMaterial = new THREE.MeshBasicMaterial({
-  color: COLORS.playerGlow,
+  map: playerTexture,
   transparent: true,
-  opacity: 0.3,
+  color: COLORS.playerGlow,
+  opacity: 0.45,
 });
 const playerGlowMesh = new THREE.Mesh(playerGlowGeometry, playerGlowMaterial);
 playerGlowMesh.position.set(playerX, playerY, -0.1);
@@ -162,13 +350,14 @@ scene.add(playerGlowMesh);
 
 // --- BULLETS ------------------------------------------------------------------
 const bulletGeometry = new THREE.BoxGeometry(BULLET_SIZE, BULLET_SIZE * 3, 0.1);
-const bulletMaterial = new THREE.MeshBasicMaterial({ color: COLORS.bullet });
+const playerBulletMaterial = new THREE.MeshBasicMaterial({ color: COLORS.playerBullet });
+const enemyBulletMaterial = new THREE.MeshBasicMaterial({ color: COLORS.enemyBullet });
 const bullets: Bullet[] = [];
 const MAX_BULLETS = 50;
 
 function initBullets(): void {
   for (let i = 0; i < MAX_BULLETS; i++) {
-    const mesh = new THREE.Mesh(bulletGeometry, bulletMaterial);
+    const mesh = new THREE.Mesh(bulletGeometry, playerBulletMaterial);
     mesh.visible = false;
     scene.add(mesh);
     bullets.push({
@@ -191,6 +380,7 @@ function fireBullet(x: number, y: number, direction: 'up' | 'down' = 'up'): void
       // Enemy shots fall slower than the player's shots rise — gives you a chance to dodge
       bullet.speed = direction === 'up' ? BULLET_SPEED : ENEMY_BULLET_SPEED;
       bullet.alive = true;
+      bullet.mesh.material = direction === 'up' ? playerBulletMaterial : enemyBulletMaterial;
       bullet.mesh.position.set(x, y, 0.2);
       bullet.mesh.visible = true;
       return;
@@ -199,18 +389,24 @@ function fireBullet(x: number, y: number, direction: 'up' | 'down' = 'up'): void
 }
 
 // --- ENEMIES ------------------------------------------------------------------
-const enemyGeometry = new THREE.BoxGeometry(ENEMY_SIZE, ENEMY_SIZE * 0.7, 0.2);
-// Per-row colors so the formation reads as ranks of invaders, not a red blob
-const ENEMY_ROW_COLORS = [0xff4499, 0xff6644, 0xffcc44, 0x44ddff, 0x88ff66];
+// Plane sized to keep the 12×8 sprite aspect; collision still uses ENEMY_SIZE.
+const enemyGeometry = new THREE.PlaneGeometry(ENEMY_SIZE, (ENEMY_SIZE * 8) / 12);
+// [tier][frame] materials, built once and reused — no per-frame allocation.
+const invaderMaterials: THREE.MeshBasicMaterial[][] = INVADER_ART.map((frames, tier) =>
+  frames.map((art) => {
+    const color = TIER_COLORS[tier] ?? '#5dff8f';
+    return new THREE.MeshBasicMaterial({ map: makePixelTexture(art, color), transparent: true });
+  })
+);
 const enemies: Enemy[] = [];
+let animFrame = 0; // toggled each march step for the wiggle
 
 function initEnemies(): void {
   for (let row = 0; row < ENEMY_ROWS; row++) {
+    const tier = tierForRow(row);
     for (let col = 0; col < enemyCols; col++) {
-      const material = new THREE.MeshBasicMaterial({
-        color: ENEMY_ROW_COLORS[row % ENEMY_ROW_COLORS.length],
-      });
-      const mesh = new THREE.Mesh(enemyGeometry, material);
+      const frames = invaderMaterials[tier];
+      const mesh = new THREE.Mesh(enemyGeometry, frames?.[0] ?? playerMaterial);
       const x = (col - (enemyCols - 1) / 2) * ENEMY_GAP;
       const y = ceilingY - 2 - row * ENEMY_GAP;
 
@@ -218,14 +414,7 @@ function initEnemies(): void {
       mesh.visible = true;
       scene.add(mesh);
 
-      enemies.push({
-        mesh,
-        x,
-        y,
-        col,
-        row,
-        alive: true,
-      });
+      enemies.push({ mesh, x, y, col, row, tier, alive: true });
     }
   }
 }
@@ -269,17 +458,19 @@ function updateEnemies(dt: number): void {
       enemyDropNext = true;
     }
 
-    // Move enemies
+    // Toggle march frame, then move + re-skin every alive invader.
+    animFrame = animFrame === 0 ? 1 : 0;
     for (const enemy of enemies) {
-      if (enemy.alive) {
-        if (enemyDropNext) {
-          enemy.y -= ENEMY_DROP;
-          enemy.mesh.position.y = enemy.y;
-        } else {
-          enemy.x += enemyDirection * enemySpeed * enemyMoveInterval;
-          enemy.mesh.position.x = enemy.x;
-        }
+      if (!enemy.alive) continue;
+      if (enemyDropNext) {
+        enemy.y -= ENEMY_DROP;
+        enemy.mesh.position.y = enemy.y;
+      } else {
+        enemy.x += enemyDirection * enemySpeed * enemyMoveInterval;
+        enemy.mesh.position.x = enemy.x;
       }
+      const mat = invaderMaterials[enemy.tier]?.[animFrame];
+      if (mat) enemy.mesh.material = mat;
     }
 
     enemyDropNext = false;
@@ -308,62 +499,75 @@ function updateEnemies(dt: number): void {
 }
 
 // --- SHIELDS ------------------------------------------------------------------
-const shieldGeometry = new THREE.BoxGeometry(SHIELD_SIZE, SHIELD_SIZE * 0.5, 0.2);
-const shieldMaterial = new THREE.MeshBasicMaterial({ color: COLORS.shield });
+const shieldGeometry = new THREE.PlaneGeometry(SHIELD_SIZE, (SHIELD_SIZE * 6) / 12);
+// Erosion frames: index = SHIELD_HEALTH - health (0 = pristine).
+const bunkerMaterials: THREE.MeshBasicMaterial[] = [0, 1, 2, 3].map(
+  (d) => new THREE.MeshBasicMaterial({ map: makeBunkerTexture(d), transparent: true })
+);
 const shields: Shield[] = [];
+
+function bunkerMaterialFor(health: number): THREE.MeshBasicMaterial {
+  const idx = Math.min(bunkerMaterials.length - 1, Math.max(0, SHIELD_HEALTH - health));
+  return bunkerMaterials[idx] ?? bunkerMaterials[0]!;
+}
 
 function initShields(): void {
   for (let i = 0; i < SHIELD_COUNT; i++) {
-    const mesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+    const mesh = new THREE.Mesh(shieldGeometry, bunkerMaterials[0]!);
     const x = (i - (SHIELD_COUNT - 1) / 2) * (app.worldWidth / (SHIELD_COUNT + 1));
     const y = groundY + 2;
 
     mesh.position.set(x, y, 0.1);
     scene.add(mesh);
 
-    shields.push({
-      mesh,
-      x,
-      y,
-      health: 3,
-      alive: true,
-    });
+    shields.push({ mesh, x, y, health: SHIELD_HEALTH, alive: true });
+  }
+}
+
+function damageShield(shield: Shield): void {
+  shield.health--;
+  if (shield.health <= 0) {
+    shield.alive = false;
+    shield.mesh.visible = false;
+  } else {
+    shield.mesh.material = bunkerMaterialFor(shield.health);
   }
 }
 
 // --- EXPLOSIONS --------------------------------------------------------------
-const explosionGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-const explosionMaterial = new THREE.MeshBasicMaterial({ color: COLORS.explosion });
+const explosionGeometry = new THREE.PlaneGeometry(0.85, 0.85);
+const explosionEnemyMaterial = new THREE.MeshBasicMaterial({
+  map: makePixelTexture(SPLAT_ART, EXPLOSION_ENEMY_COLOR),
+  transparent: true,
+});
+const explosionPlayerMaterial = new THREE.MeshBasicMaterial({
+  map: makePixelTexture(SPLAT_ART, EXPLOSION_PLAYER_COLOR),
+  transparent: true,
+});
 const explosions: Explosion[] = [];
 const MAX_EXPLOSIONS = 20;
 
 function initExplosions(): void {
   for (let i = 0; i < MAX_EXPLOSIONS; i++) {
-    const mesh = new THREE.Mesh(explosionGeometry, explosionMaterial);
+    const mesh = new THREE.Mesh(explosionGeometry, explosionEnemyMaterial);
     mesh.visible = false;
     scene.add(mesh);
 
-    explosions.push({
-      mesh,
-      x: 0,
-      y: 0,
-      life: 0,
-      maxLife: 0.5,
-      alive: false,
-    });
+    explosions.push({ mesh, x: 0, y: 0, life: 0, maxLife: 0.32, alive: false });
   }
 }
 
-function createExplosion(x: number, y: number): void {
+function createExplosion(x: number, y: number, kind: 'enemy' | 'player' = 'enemy'): void {
   for (const explosion of explosions) {
     if (!explosion.alive) {
       explosion.x = x;
       explosion.y = y;
       explosion.life = explosion.maxLife;
       explosion.alive = true;
+      explosion.mesh.material = kind === 'player' ? explosionPlayerMaterial : explosionEnemyMaterial;
       explosion.mesh.position.set(x, y, 0.3);
+      explosion.mesh.scale.set(1, 1, 1);
       explosion.mesh.visible = true;
-      explosion.mesh.scale.set(0.5, 0.5, 0.5);
       return;
     }
   }
@@ -388,7 +592,7 @@ function checkCollisions(): void {
         enemy.alive = false;
         enemy.mesh.visible = false;
 
-        createExplosion(enemy.x, enemy.y);
+        createExplosion(enemy.x, enemy.y, 'enemy');
         addScore(100);
 
         // Check if all enemies are dead
@@ -413,7 +617,7 @@ function checkCollisions(): void {
         bullet.alive = false;
         bullet.mesh.visible = false;
 
-        createExplosion(playerX, playerY);
+        createExplosion(playerX, playerY, 'player');
         lives--;
         updateLivesDisplay();
 
@@ -442,12 +646,7 @@ function checkCollisions(): void {
       if (distance < (SHIELD_SIZE + BULLET_SIZE) / 2) {
         bullet.alive = false;
         bullet.mesh.visible = false;
-        shield.health--;
-
-        if (shield.health <= 0) {
-          shield.alive = false;
-          shield.mesh.visible = false;
-        }
+        damageShield(shield);
         break;
       }
     }
@@ -467,12 +666,7 @@ function checkCollisions(): void {
       if (distance < (SHIELD_SIZE + BULLET_SIZE) / 2) {
         bullet.alive = false;
         bullet.mesh.visible = false;
-        shield.health--;
-
-        if (shield.health <= 0) {
-          shield.alive = false;
-          shield.mesh.visible = false;
-        }
+        damageShield(shield);
         break;
       }
     }
@@ -486,9 +680,11 @@ let lives = INITIAL_LIVES;
 let elapsed = 0;
 let invincibilityTime = 0;
 let wave = 1;
+let playerFireCooldown = 0;
 
 const scoreDisplay = document.getElementById('space-invaders-score') as HTMLElement;
 const livesDisplay = document.getElementById('space-invaders-lives') as HTMLElement;
+const waveDisplay = document.getElementById('space-invaders-wave') as HTMLElement;
 const gameOverlay = document.getElementById('space-invaders-game-overlay') as HTMLElement;
 const startBtn = document.getElementById('space-invaders-start-btn') as HTMLButtonElement;
 const buildStamp = document.getElementById('space-invaders-build-stamp') as HTMLElement;
@@ -507,21 +703,17 @@ leaderboardBtn.addEventListener('click', (e) => {
 });
 
 // Start button
-startBtn.addEventListener('click', () => {
+startBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
   startGame();
-});
-
-// Tap to start / restart / continue
-window.addEventListener('pointerdown', () => {
-  if (state === 'ready' || state === 'gameover') {
-    startGame();
-  } else if (state === 'victory') {
-    nextWave();
-  }
 });
 
 function updateLivesDisplay(): void {
   livesDisplay.textContent = '❤️'.repeat(lives);
+}
+
+function updateWaveDisplay(): void {
+  waveDisplay.textContent = `WAVE ${wave}`;
 }
 
 function addScore(points: number): void {
@@ -535,37 +727,36 @@ function addScore(points: number): void {
   }, 100);
 }
 
-function flashPlayer(): void {
-  playerMesh.material.color.setHex(COLORS.playerGlow);
-  setTimeout(() => {
-    playerMesh.material.color.setHex(COLORS.player);
-  }, 50);
-}
-
 // Repopulate the board for a fresh wave (enemies/shields/bullets/explosions + player),
 // without touching score or lives. Shared by startGame() and nextWave().
 function spawnWave(): void {
   // Reset player to center
   playerX = 0;
+  targetX = 0;
   playerY = groundY + 1.5;
+  playerFireCooldown = 0;
   playerMesh.position.set(playerX, playerY, 0.1);
   playerGlowMesh.position.set(playerX, playerY, -0.1);
   playerMesh.visible = true;
   playerGlowMesh.visible = true;
 
   // Reset enemies
+  animFrame = 0;
   for (const enemy of enemies) {
     enemy.x = (enemy.col - (enemyCols - 1) / 2) * ENEMY_GAP;
     enemy.y = ceilingY - 2 - enemy.row * ENEMY_GAP;
     enemy.alive = true;
+    const frames = invaderMaterials[enemy.tier];
+    if (frames && frames[0]) enemy.mesh.material = frames[0];
     enemy.mesh.position.set(enemy.x, enemy.y, 0.1);
     enemy.mesh.visible = true;
   }
 
   // Reset shields
   for (const shield of shields) {
-    shield.health = 3;
+    shield.health = SHIELD_HEALTH;
     shield.alive = true;
+    shield.mesh.material = bunkerMaterials[0]!;
     shield.mesh.visible = true;
   }
 
@@ -603,6 +794,7 @@ function startGame(): void {
 
   scoreDisplay.textContent = '0';
   updateLivesDisplay();
+  updateWaveDisplay();
 
   spawnWave();
   showPlayingUI();
@@ -613,6 +805,7 @@ function nextWave(): void {
   state = 'playing';
   wave++;
   enemySpeed = ENEMY_SPEED_BASE + (wave - 1) * ENEMY_SPEED_INCREMENT;
+  updateWaveDisplay();
 
   spawnWave();
   showPlayingUI();
@@ -621,7 +814,7 @@ function nextWave(): void {
 function gameOver(): void {
   state = 'gameover';
   hud.style.display = 'none';
-  gameOverlay.innerHTML = '<h1>Game Over</h1><p>Tap to Restart</p>';
+  gameOverlay.innerHTML = '<h1>GAME OVER</h1><p>Tap to Restart</p>';
   gameOverlay.style.display = 'flex';
   startBtn.style.display = 'none';
   leaderboardBtn.style.display = 'block';
@@ -634,7 +827,7 @@ function victory(): void {
   state = 'victory';
   hud.style.display = 'none';
   // wave is incremented in nextWave(); show the wave the player just cleared
-  gameOverlay.innerHTML = `<h1>Wave ${wave} Complete!</h1><p>Tap to Continue</p>`;
+  gameOverlay.innerHTML = `<h1>WAVE ${wave} CLEAR</h1><p>Tap to Continue</p>`;
   gameOverlay.style.display = 'flex';
   startBtn.style.display = 'none';
   leaderboardBtn.style.display = 'none';
@@ -652,6 +845,7 @@ buildStamp.textContent = __BUILD_INFO__;
 // --- INITIALIZATION ----------------------------------------------------------
 function init(): void {
   createStarfield();
+  createGroundLine();
   initBullets();
   initEnemies();
   initShields();
@@ -672,6 +866,27 @@ function update(dt: number): void {
   elapsed += dt;
 
   if (state === 'playing') {
+
+  // Keyboard hold-to-steer slides the target; touch drag sets it directly.
+  if (keyLeft) targetX -= PLAYER_SPEED * dt;
+  if (keyRight) targetX += PLAYER_SPEED * dt;
+  targetX = THREE.MathUtils.clamp(
+    targetX,
+    -app.worldWidth / 2 + PLAYER_SIZE / 2,
+    app.worldWidth / 2 - PLAYER_SIZE / 2
+  );
+
+  // Smooth chase toward the target so the ship doesn't teleport under the finger.
+  playerX += (targetX - playerX) * Math.min(1, PLAYER_LERP * dt);
+  playerMesh.position.x = playerX;
+  playerGlowMesh.position.x = playerX;
+
+  // Auto-fire at a capped rate — no tap needed on mobile.
+  playerFireCooldown -= dt;
+  if (playerFireCooldown <= 0) {
+    fireBullet(playerX, playerY + PLAYER_HEIGHT / 2, 'up');
+    playerFireCooldown = PLAYER_FIRE_INTERVAL;
+  }
 
   // Update invincibility timer
   if (invincibilityTime > 0) {
@@ -708,7 +923,7 @@ function update(dt: number): void {
   // Update enemies
   updateEnemies(dt);
 
-  // Update explosions
+  // Update explosions — pixel splat lingers briefly, then vanishes
   for (const explosion of explosions) {
     if (!explosion.alive) continue;
 
@@ -716,17 +931,6 @@ function update(dt: number): void {
     if (explosion.life <= 0) {
       explosion.alive = false;
       explosion.mesh.visible = false;
-    } else {
-      // Animate explosion
-      const progress = explosion.life / explosion.maxLife;
-      explosion.mesh.scale.set(
-        0.5 * (1 - progress),
-        0.5 * (1 - progress),
-        0.5 * (1 - progress)
-      );
-      (explosion.mesh.material as THREE.MeshBasicMaterial).color.setHex(
-        COLORS.explosion + Math.floor((1 - progress) * 0x44)
-      );
     }
   }
 
@@ -739,52 +943,67 @@ function update(dt: number): void {
 }
 
 // --- INPUT HANDLING ----------------------------------------------------------
-let touchX = 0;
+// Map a screen X (px) edge-to-edge to the ship's world X (mirrors synth-rider).
+function setTargetFromClientX(clientX: number): void {
+  const viewW = window.visualViewport?.width ?? window.innerWidth;
+  const nx = (clientX / viewW) * 2 - 1; // -1 (left) .. 1 (right)
+  targetX = THREE.MathUtils.clamp(
+    nx * (app.worldWidth / 2),
+    -app.worldWidth / 2 + PLAYER_SIZE / 2,
+    app.worldWidth / 2 - PLAYER_SIZE / 2
+  );
+}
+
+let dragging = false;
+let keyLeft = false;
+let keyRight = false;
+
+window.addEventListener('pointerdown', (e) => {
+  const t = e.target as HTMLElement;
+  // Ignore UI buttons / the leaderboard modal.
+  if (t.closest('#space-invaders-start-btn') ||
+      t.closest('#space-invaders-leaderboard-btn') ||
+      t.closest('.gl-leaderboard-backdrop')) {
+    return;
+  }
+
+  if (state === 'ready' || state === 'gameover') {
+    startGame();
+    return; // don't begin a drag on the gesture that starts the game
+  }
+  if (state === 'victory') {
+    nextWave();
+    return;
+  }
+
+  // playing — begin dragging the ship
+  dragging = true;
+  setTargetFromClientX(e.clientX);
+});
 
 window.addEventListener('pointermove', (e) => {
-  if (state !== 'playing') return;
-
-  // Convert screen coordinates to world coordinates
-  const rect = renderer.domElement.getBoundingClientRect();
-  const screenX = (e.clientX - rect.left) / rect.width * 2 - 1;
-
-  // Convert to world coordinates
-  const worldX = screenX * (app.worldWidth / 2);
-
-  touchX = worldX;
-
-  // Move player
-  playerX = THREE.MathUtils.clamp(touchX, -app.worldWidth / 2 + PLAYER_SIZE / 2, app.worldWidth / 2 - PLAYER_SIZE / 2);
-  playerMesh.position.x = playerX;
-  playerGlowMesh.position.x = playerX;
+  if (dragging && state === 'playing') setTargetFromClientX(e.clientX);
+});
+window.addEventListener('pointerup', () => {
+  dragging = false;
+});
+window.addEventListener('pointercancel', () => {
+  dragging = false;
 });
 
-window.addEventListener('pointerdown', () => {
-  if (state !== 'playing') return;
-
-  // Fire bullet from player position
-  fireBullet(playerX, playerY + PLAYER_HEIGHT / 2);
-  flashPlayer();
-});
-
-// Keyboard support for debugging on desktop
+// Keyboard support for desktop — auto-fire handles shooting, arrows/A/D steer.
 window.addEventListener('keydown', (e) => {
-  if (state !== 'playing') return;
-
   if (e.code === 'Space') {
-    fireBullet(playerX, playerY + PLAYER_HEIGHT / 2);
-    flashPlayer();
+    e.preventDefault(); // swallow so a focused button doesn't restart / page doesn't scroll
+    return;
   }
-  if (e.code === 'ArrowLeft') {
-    playerX = THREE.MathUtils.clamp(playerX - PLAYER_SPEED * 0.016, -app.worldWidth / 2 + PLAYER_SIZE / 2, app.worldWidth / 2 - PLAYER_SIZE / 2);
-    playerMesh.position.x = playerX;
-    playerGlowMesh.position.x = playerX;
-  }
-  if (e.code === 'ArrowRight') {
-    playerX = THREE.MathUtils.clamp(playerX + PLAYER_SPEED * 0.016, -app.worldWidth / 2 + PLAYER_SIZE / 2, app.worldWidth / 2 - PLAYER_SIZE / 2);
-    playerMesh.position.x = playerX;
-    playerGlowMesh.position.x = playerX;
-  }
+  if (state !== 'playing') return;
+  if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keyLeft = true;
+  else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keyRight = true;
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keyLeft = false;
+  else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keyRight = false;
 });
 
 // --- START THE GAME ---------------------------------------------------------

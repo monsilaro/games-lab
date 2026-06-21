@@ -28,7 +28,8 @@
         overscroll-behavior: none;
         background: #0a0a1a;
         color: #f4f4f6;
-        font-family: -apple-system, system-ui, sans-serif;
+        font-family: 'Courier New', ui-monospace, 'SF Mono', Menlo, monospace;
+        letter-spacing: 1px;
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
@@ -40,6 +41,21 @@
         display: block;
         touch-action: none;
         z-index: 0;
+      }
+      /* Subtle CRT scanlines over everything (non-interactive). */
+      #space-invaders-scanlines {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0) 0px,
+          rgba(0, 0, 0, 0) 2px,
+          rgba(0, 0, 0, 0.18) 3px,
+          rgba(0, 0, 0, 0.18) 4px
+        );
+        mix-blend-mode: multiply;
       }
       #space-invaders-hud {
         position: fixed;
@@ -53,15 +69,23 @@
         pointer-events: none;
       }
       #space-invaders-score {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 800;
         color: #00ff88;
         text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        transition: transform 0.1s ease-out;
+      }
+      #space-invaders-wave {
+        font-size: 16px;
+        font-weight: 800;
+        color: rgba(92, 242, 255, 0.9);
+        text-shadow: 0 0 10px rgba(92, 242, 255, 0.4);
+        align-self: center;
       }
       #space-invaders-lives {
-        font-size: 24px;
+        font-size: 20px;
         font-weight: 800;
-        color: #ff4444;
+        color: #ff5cc8;
       }
       #space-invaders-game-overlay {
         position: fixed;
@@ -148,13 +172,16 @@
   <body>
     <div id="space-invaders-hud">
       <span id="space-invaders-score">0</span>
+      <span id="space-invaders-wave">WAVE 1</span>
       <span id="space-invaders-lives">❤️❤️❤️</span>
     </div>
     <div id="space-invaders-build-stamp"></div>
     <div id="space-invaders-game-overlay">
-      <h1>Space Invaders</h1>
+      <h1>SPACE INVADERS</h1>
       <p>Tap to Start</p>
+      <p style="font-size: 14px; opacity: 0.7">Drag to move · auto-fire</p>
     </div>
+    <div id="space-invaders-scanlines"></div>
     <button id="space-invaders-start-btn" type="button">Start Game</button>
     <button id="space-invaders-leaderboard-btn" type="button">🏆 Classement</button>
     <script type="module" src="/src/main.ts"></script>
