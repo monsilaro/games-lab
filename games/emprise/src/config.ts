@@ -45,6 +45,30 @@ export const EXPAND_COST_SIZE_FACTOR = 0.001; // per owned cell
 // Hard cap on neutral cells converted per sim tick (front advance speed).
 export const MAX_CONVERSIONS_PER_TICK = 120;
 
+// --- Combat (Phase 2) ----------------------------------------------------
+// Force of an owner = banked Balance + a bonus for sheer size, so a big empire
+// is inherently tougher even just after spending.
+export const STRENGTH_SIZE_FACTOR = 0.5; // per owned cell
+// Cost to conquer an ENEMY cell = base * (1 + DEFENSE_FACTOR * defStr/atkStr).
+// Attacking someone stronger gets expensive fast → you stall and drain.
+export const ATTACK_COST_BASE = 3;
+export const DEFENSE_FACTOR = 1.5;
+
+// --- Enemies (Phase 2: passive defenders, fixed spawns) ------------------
+// Phase 3 replaces these fixed spawns with distributed spawns + difficulty.
+export interface SpawnPoint {
+  x: number;
+  y: number;
+}
+export const ENEMY_SPAWNS: readonly SpawnPoint[] = [
+  { x: 40, y: 56 },
+  { x: 104, y: 56 },
+  { x: 72, y: 224 },
+];
+export const ENEMY_START_RADIUS = 6; // bigger than the player's start (a threat)
+// Phase 2 enemies never grab neutral — they only bank, defend, and counter.
+export const ENEMY_DEFENSIVE = true;
+
 // --- Colors (0xRRGGBB; packed to RGBA in render.ts) ----------------------
 // Reuse the repo AURORA night palette: warm ember is reserved for the player,
 // everything else stays cold.

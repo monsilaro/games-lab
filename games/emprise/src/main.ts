@@ -1,9 +1,9 @@
-// Emprise — boot, canvas/DPR sizing, fixed-step loop wiring, touch input, HUD.
+// Emprise — boot, canvas/DPR sizing, fixed-step loop, touch input, HUD, rounds.
 
 import { startGameLoop } from '@games-lab/shared';
 import { SIM_STEP, OWNER_PLAYER } from './config';
-import { createGrid } from './grid';
-import { createSim, setTarget, simTick, clearDirty } from './sim';
+import { createGrid, type Grid } from './grid';
+import { createSim, setTarget, simTick, clearDirty, clearTarget, type Sim } from './sim';
 import {
   createRenderer,
   paintFull,
@@ -16,10 +16,12 @@ import {
 declare const __BUILD_INFO__: string;
 
 const canvas = document.getElementById('emprise-game-canvas') as HTMLCanvasElement;
-
-const grid = createGrid();
-const sim = createSim(grid);
 const renderer = createRenderer(canvas);
+
+let grid: Grid = createGrid();
+let sim: Sim = createSim(grid);
+let landCount = grid.landCount;
+let running = true;
 
 // --- canvas sizing (DPR capped at 2) -------------------------------------
 let cssW = 0;
@@ -44,6 +46,7 @@ paintFull(renderer, grid);
 // --- input: tap/drag steers the expansion target -------------------------
 let pointerDown = false;
 function steer(e: PointerEvent): void {
+  if (!running) return;
   const cell = pointerToCell(renderer, e.clientX, e.clientY);
   if (cell) setTarget(sim, cell.x, cell.y);
 }
@@ -69,11 +72,16 @@ canvas.addEventListener('pointercancel', () => {
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
-// --- HUD -----------------------------------------------------------------
+// --- HUD + round overlay -------------------------------------------------
 const balEl = document.getElementById('emprise-hud-balance') as HTMLElement;
 const pctEl = document.getElementById('emprise-hud-percent') as HTMLElement;
+const rivalsEl = document.getElementById('emprise-hud-rivals') as HTMLElement;
 const fpsEl = document.getElementById('emprise-hud-fps') as HTMLElement;
 const hintEl = document.getElementById('emprise-hint') as HTMLElement | null;
+const overlayEl = document.getElementById('emprise-end-overlay') as HTMLElement;
+const endTitleEl = document.getElementById('emprise-end-title') as HTMLElement;
+const endSubEl = document.getElementById('emprise-end-sub') as HTMLElement;
+const restartBtn = document.getElementById('emprise-restart-btn') as HTMLButtonElement;
 const stampEl = document.getElementById('emprise-build-stamp');
 if (stampEl) stampEl.textContent = __BUILD_INFO__;
 
@@ -85,7 +93,38 @@ function dismissHint(): void {
 }
 canvas.addEventListener('pointerdown', dismissHint);
 
-const landCount = grid.landCount;
+function rivalsAlive(): number {
+  let n = 0;
+  for (let a = 0; a < sim.activeOwners.length; a++) {
+    const o = sim.activeOwners[a];
+    if (o !== OWNER_PLAYER && grid.ownedCount[o] > 0) n++;
+  }
+  return n;
+}
+
+function endRound(win: boolean): void {
+  running = false;
+  endTitleEl.textContent = win ? 'Empire total' : 'Conquis';
+  endSubEl.textContent = win
+    ? 'Tous tes rivaux sont tombés.'
+    : 'Ton territoire a été englouti.';
+  overlayEl.classList.add('emprise-end-active');
+}
+
+function newGame(): void {
+  grid = createGrid();
+  sim = createSim(grid);
+  landCount = grid.landCount;
+  clearTarget(sim);
+  running = true;
+  acc = 0;
+  overlayEl.classList.remove('emprise-end-active');
+  paintFull(renderer, grid);
+}
+restartBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  newGame();
+});
 
 // --- loop: fixed-step sim, decoupled from render -------------------------
 const MAX_STEPS_PER_FRAME = 5; // spiral-of-death guard
@@ -101,15 +140,20 @@ startGameLoop((dt) => {
   lastFrame = now;
   if (frameMs > 0) fps += (1000 / frameMs - fps) * 0.1;
 
-  // Fixed-step simulation.
-  acc += dt;
-  let steps = 0;
-  while (acc >= SIM_STEP && steps < MAX_STEPS_PER_FRAME) {
-    simTick(sim, SIM_STEP);
-    acc -= SIM_STEP;
-    steps++;
+  if (running) {
+    acc += dt;
+    let steps = 0;
+    while (acc >= SIM_STEP && steps < MAX_STEPS_PER_FRAME) {
+      simTick(sim, SIM_STEP);
+      acc -= SIM_STEP;
+      steps++;
+    }
+    if (acc > SIM_STEP) acc = 0; // drop backlog rather than spiral
+
+    // Round end.
+    if (grid.ownedCount[OWNER_PLAYER] === 0) endRound(false);
+    else if (rivalsAlive() === 0) endRound(true);
   }
-  if (acc > SIM_STEP) acc = 0; // drop backlog rather than spiral
 
   // Render: changed cells → offscreen, then one scaled blit.
   applyDirty(renderer, sim);
@@ -123,6 +167,7 @@ startGameLoop((dt) => {
     balEl.textContent = Math.floor(grid.balance[OWNER_PLAYER]).toString();
     const owned = grid.ownedCount[OWNER_PLAYER];
     pctEl.textContent = `${((owned / landCount) * 100).toFixed(1)}%`;
+    rivalsEl.textContent = rivalsAlive().toString();
     fpsEl.textContent = Math.round(fps).toString();
   }
 });

@@ -13,6 +13,10 @@ import {
   START_ZONE_RADIUS,
   SPAWN_X,
   SPAWN_Y,
+  BALANCE_CAP_BASE,
+  BALANCE_CAP_PER_CELL,
+  ENEMY_SPAWNS,
+  ENEMY_START_RADIUS,
 } from './config';
 
 export interface Grid {
@@ -54,16 +58,36 @@ export function createGrid(): Grid {
   }
 
   // Player start zone: a small square around the spawn, clamped to land.
-  const r = START_ZONE_RADIUS;
-  for (let y = SPAWN_Y - r; y <= SPAWN_Y + r; y++) {
-    for (let x = SPAWN_X - r; x <= SPAWN_X + r; x++) {
-      if (!inBounds(x, y)) continue;
-      const i = idx(x, y);
-      if (owner[i] === OWNER_WATER) continue;
-      owner[i] = OWNER_PLAYER;
-      ownedCount[OWNER_PLAYER]++;
-    }
+  stampZone(owner, ownedCount, SPAWN_X, SPAWN_Y, START_ZONE_RADIUS, OWNER_PLAYER);
+
+  // Enemy blobs (Phase 2: fixed spawns). Owner ids start at 2.
+  for (let e = 0; e < ENEMY_SPAWNS.length; e++) {
+    const s = ENEMY_SPAWNS[e];
+    const id = 2 + e;
+    stampZone(owner, ownedCount, s.x, s.y, ENEMY_START_RADIUS, id);
+    // Start with Balance at the soft cap so they can defend from t=0.
+    balance[id] = BALANCE_CAP_BASE + BALANCE_CAP_PER_CELL * ownedCount[id];
   }
 
   return { owner, balance, ownedCount, landCount: CELL_COUNT - waterCount };
+}
+
+/** Stamp a filled square of `id` centred at (cx,cy), skipping water/out-of-bounds. */
+function stampZone(
+  owner: Uint8Array,
+  ownedCount: Uint32Array,
+  cx: number,
+  cy: number,
+  radius: number,
+  id: number,
+): void {
+  for (let y = cy - radius; y <= cy + radius; y++) {
+    for (let x = cx - radius; x <= cx + radius; x++) {
+      if (!inBounds(x, y)) continue;
+      const i = idx(x, y);
+      if (owner[i] === OWNER_WATER || owner[i] === id) continue;
+      owner[i] = id;
+      ownedCount[id]++;
+    }
+  }
 }

@@ -107,6 +107,58 @@
         opacity: 0;
       }
 
+      /* Round-end overlay (win + game-over), hidden by default. */
+      .emprise-end {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+        background: rgba(5, 7, 13, 0.82);
+        backdrop-filter: blur(6px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.35s ease;
+      }
+      .emprise-end.emprise-end-active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .emprise-end h2 {
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        color: #ffd166;
+      }
+      .emprise-end p {
+        font-size: 16px;
+        color: #9fb0cc;
+        max-width: 280px;
+        line-height: 1.5;
+      }
+      #emprise-restart-btn {
+        margin-top: 6px;
+        padding: 12px 30px;
+        font: inherit;
+        font-size: 17px;
+        font-weight: 700;
+        color: #05070d;
+        background: #ff9f1c;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #emprise-restart-btn:active {
+        transform: scale(0.97);
+        background: #ffd166;
+      }
+
       #emprise-build-stamp {
         position: fixed;
         z-index: 5;
@@ -132,12 +184,22 @@
         <span class="emprise-value" id="emprise-hud-percent">0%</span>
       </div>
       <div class="emprise-stat">
+        <span class="emprise-label">Rivaux</span>
+        <span class="emprise-value" id="emprise-hud-rivals">0</span>
+      </div>
+      <div class="emprise-stat">
         <span class="emprise-label">FPS</span>
         <span class="emprise-value" id="emprise-hud-fps">60</span>
       </div>
     </div>
 
     <div class="emprise-hint" id="emprise-hint">Touche et glisse pour t'étendre</div>
+
+    <div class="emprise-end" id="emprise-end-overlay">
+      <h2 id="emprise-end-title">Conquis</h2>
+      <p id="emprise-end-sub">Ton territoire a été englouti.</p>
+      <button id="emprise-restart-btn">Rejouer</button>
+    </div>
 
     <div id="emprise-build-stamp"></div>
 
