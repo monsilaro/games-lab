@@ -12,6 +12,15 @@ declare const __BUILD_INFO__: string;
 // --- Game Settings & Constants ---------------------------------------------
 const LEADERBOARD_GAME = 'synth-rider';
 const LANES = [-3.5, 0, 3.5];
+const TRACK_HALF = 4.0; // max |x| the ship can reach (just past the ±3.5 outer lanes)
+const KEY_SPEED = 7.5; // world units/sec for keyboard hold-to-steer
+
+// Camera framing: vertical FOV is widened on narrow (portrait) screens so the
+// horizontal field stays wide enough to keep all three lanes on-screen.
+const DESIGN_FOV = 60; // vertical FOV at/above the design aspect (landscape-ish)
+const DESIGN_ASPECT = 1.0; // below this aspect we preserve the horizontal extent
+const MAX_FOV = 100; // clamp so portrait doesn't distort wildly
+
 const BASE_SPEED = 35;
 const MAX_SPEED = 80;
 const SPEED_ACCEL = 0.4; // speed increases by this much per second
@@ -27,8 +36,7 @@ let bestScore = 0;
 let scrollSpeed = BASE_SPEED;
 let elapsed = 0;
 let obstacleTimer = 0;
-let laneIndex = 1; // Start in middle lane (LANES[1] = 0)
-let targetX = 0;
+let targetX = 0; // free horizontal target the ship lerps toward (drag / keys set this)
 
 // Camera base configuration
 const camBasePos = new THREE.Vector3(0, 2.8, 5.5);
@@ -164,7 +172,7 @@ function initEngine(): void {
   scene.fog = new THREE.FogExp2(0x08090f, 0.008);
 
   camera = new THREE.PerspectiveCamera(
-    65,
+    DESIGN_FOV,
     window.innerWidth / window.innerHeight,
     0.1,
     500
@@ -411,8 +419,7 @@ function startGame(): void {
   elapsed = 0;
   scrollSpeed = BASE_SPEED;
   obstacleTimer = 0;
-  laneIndex = 1;
-  targetX = LANES[1]!;
+  targetX = 0; // ship centered
 
   // Reset player
   playerGroup.position.set(0, 0.5, 0);
@@ -488,74 +495,99 @@ function disposeGroup(group: THREE.Group): void {
 
 // --- Window Resizing ------------------------------------------------------
 function resize(): void {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  // visualViewport tracks the true visible area, so the iOS dynamic toolbar
+  // showing/hiding doesn't leave a gap or stretch the scene.
+  const vv = window.visualViewport;
+  const w = Math.round(vv?.width ?? window.innerWidth);
+  const h = Math.round(vv?.height ?? window.innerHeight);
   renderer.setSize(w, h);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  camera.aspect = w / h;
+
+  const aspect = w / h;
+  if (aspect >= DESIGN_ASPECT) {
+    camera.fov = DESIGN_FOV;
+  } else {
+    // Narrow (portrait) screen: widen the vertical FOV to keep the horizontal
+    // extent fixed, so the outer lanes stay on-screen instead of clipping off.
+    const designVTan = Math.tan((DESIGN_FOV * Math.PI) / 360);
+    const designHTan = designVTan * DESIGN_ASPECT; // horizontal half-extent at design
+    const vTan = designHTan / aspect; // vertical half-extent needed at this aspect
+    camera.fov = Math.min(MAX_FOV, (Math.atan(vTan) * 360) / Math.PI);
+  }
+  camera.aspect = aspect;
   camera.updateProjectionMatrix();
 }
 
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
+window.visualViewport?.addEventListener('resize', resize);
 
 // --- Input Controls -------------------------------------------------------
-function handleLeft(): void {
-  if (state !== 'playing') return;
-  if (laneIndex > 0) {
-    laneIndex--;
-    targetX = LANES[laneIndex]!;
-    showTouchFeedback('left');
-  }
+const clampTarget = (x: number): number => Math.max(-TRACK_HALF, Math.min(TRACK_HALF, x));
+
+// Map a screen X (px) to the ship's world X, edge-to-edge across the track,
+// so the ship sits under the finger.
+function setTargetFromClientX(clientX: number): void {
+  const viewW = window.visualViewport?.width ?? window.innerWidth;
+  const nx = (clientX / viewW) * 2 - 1; // -1 (left edge) .. 1 (right edge)
+  targetX = clampTarget(nx * TRACK_HALF);
 }
 
-function handleRight(): void {
-  if (state !== 'playing') return;
-  if (laneIndex < 2) {
-    laneIndex++;
-    targetX = LANES[laneIndex]!;
-    showTouchFeedback('right');
-  }
-}
+// Keyboard: hold A/← or D/→ to slide continuously (integrated in the loop).
+let keyLeft = false;
+let keyRight = false;
 
-// Keyboard
 window.addEventListener('keydown', (e) => {
+  // Swallow Space so it doesn't activate a focused button (which would restart the game) or scroll the page
+  if (e.code === 'Space') {
+    e.preventDefault();
+    return;
+  }
   // Don't steer the ship while the leaderboard modal is open
   if (document.querySelector('.gl-leaderboard-backdrop')) {
     return;
   }
   if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
-    handleLeft();
+    keyLeft = true;
   } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
-    handleRight();
+    keyRight = true;
   }
 });
 
-// Touch (Lane Switch)
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+    keyLeft = false;
+  } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+    keyRight = false;
+  }
+});
+
+// Touch / mouse: drag the ship horizontally — it follows the finger.
+let dragging = false;
+
 window.addEventListener('pointerdown', (e) => {
   if (state !== 'playing') return;
 
-  // Block touch switches if tapping UI buttons or overlays
+  // Ignore presses on UI buttons or the leaderboard overlay.
   const target = e.target as HTMLElement;
   if (target.closest('.synth-rider-neon-btn') || target.closest('.gl-leaderboard-backdrop')) {
     return;
   }
 
-  const halfWidth = window.innerWidth / 2;
-  if (e.clientX < halfWidth) {
-    handleLeft();
-  } else {
-    handleRight();
-  }
+  dragging = true;
+  setTargetFromClientX(e.clientX);
 });
 
-function showTouchFeedback(side: 'left' | 'right'): void {
-  const el = document.getElementById(side === 'left' ? 'synth-rider-touch-left' : 'synth-rider-touch-right');
-  if (el) {
-    el.classList.add('active');
-    setTimeout(() => el.classList.remove('active'), 150);
-  }
-}
+window.addEventListener('pointermove', (e) => {
+  if (dragging && state === 'playing') setTargetFromClientX(e.clientX);
+});
+
+window.addEventListener('pointerup', () => {
+  dragging = false;
+});
+window.addEventListener('pointercancel', () => {
+  dragging = false;
+});
 
 // Prevent pinch-zooming / scrolling gestures on iOS
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
@@ -623,6 +655,12 @@ function gameLoop(now: number): void {
     // Score accumulation
     score = Math.floor(elapsed * 12);
     scoreVal.textContent = String(score);
+
+    // Keyboard hold-to-steer slides the target continuously
+    const keyDir = (keyRight ? 1 : 0) - (keyLeft ? 1 : 0);
+    if (keyDir !== 0) {
+      targetX = clampTarget(targetX + keyDir * KEY_SPEED * dt);
+    }
 
     // Interpolate spaceship X position
     playerGroup.position.x += (targetX - playerGroup.position.x) * 15 * dt;

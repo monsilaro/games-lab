@@ -233,28 +233,6 @@
         transform: translateY(1px);
       }
 
-      /* Mobile visual layout for touch lanes */
-      #mobile-touch-indicators {
-        position: fixed;
-        inset: 0;
-        display: none;
-        pointer-events: none;
-        z-index: 1;
-      }
-      .touch-side {
-        width: 50%;
-        height: 100%;
-        opacity: 0;
-        transition: opacity 0.15s ease;
-        background: linear-gradient(to right, rgba(255, 159, 28, 0.05), transparent);
-      }
-      .touch-side-right {
-        background: linear-gradient(to left, rgba(255, 159, 28, 0.05), transparent);
-      }
-      .touch-side.active {
-        opacity: 1;
-      }
-
       /* --- Build Stamp --------------------------------------------------- */
       #synth-rider-build-stamp {
         position: fixed;
@@ -286,19 +264,19 @@
         
         <div class="controls-guide">
           <div class="controls-row">
-            <span>Move Left</span>
+            <span>Steer Left</span>
             <div>
-              <span class="key-cap">A</span> or <span class="key-cap">←</span>
+              hold <span class="key-cap">A</span> or <span class="key-cap">←</span>
             </div>
           </div>
           <div class="controls-row">
-            <span>Move Right</span>
+            <span>Steer Right</span>
             <div>
-              <span class="key-cap">D</span> or <span class="key-cap">→</span>
+              hold <span class="key-cap">D</span> or <span class="key-cap">→</span>
             </div>
           </div>
           <div class="controls-row" style="margin-top: 4px; font-size: 11px; opacity: 0.8; justify-content: center;">
-            <span>📱 Mobile: Tap Left/Right halves of screen</span>
+            <span>📱 Drag left / right to steer the ship</span>
           </div>
         </div>
 
@@ -322,12 +300,6 @@
           <button id="synth-rider-gameover-leaderboard-btn" type="button" class="synth-rider-neon-btn btn-secondary">🏆 Leaderboard</button>
         </div>
       </div>
-    </div>
-
-    <!-- Mobile Touch Overlay Areas for feedback (pure visual) -->
-    <div id="mobile-touch-indicators">
-      <div id="synth-rider-touch-left" class="touch-side"></div>
-      <div id="synth-rider-touch-right" class="touch-side touch-side-right"></div>
     </div>
 
     <!-- Build Stamp -->
