@@ -22,7 +22,7 @@ export const MAX_OWNERS = 256; // Uint8 id space; per-owner arrays sized to this
 // --- Map -----------------------------------------------------------------
 export const WATER_BORDER = true; // impassable frame for a visible boundary
 export const WATER_BORDER_THICKNESS = 3; // cells
-export const START_ZONE_RADIUS = 4; // half-size of every spawn square (player + bots)
+export const START_ZONE_RADIUS = 6; // half-size of every spawn square (player + bots)
 
 // --- Simulation ----------------------------------------------------------
 export const SIM_HZ = 30; // fixed-step frequency (decoupled from render)
@@ -39,9 +39,9 @@ export const BALANCE_CAP_PER_CELL = 2.5;
 // self-slows the bigger you get (the territorial.io feel). The asymptotic
 // expansion rate ≈ BALANCE_PER_CELL_PER_SEC / EXPAND_COST_SIZE_FACTOR cells/s.
 export const EXPAND_COST_BASE = 1.0;
-export const EXPAND_COST_SIZE_FACTOR = 0.001; // per owned cell
+export const EXPAND_COST_SIZE_FACTOR = 0.0008; // per owned cell
 // Hard cap on neutral cells converted per sim tick (front advance speed).
-export const MAX_CONVERSIONS_PER_TICK = 120;
+export const MAX_CONVERSIONS_PER_TICK = 200;
 
 // --- Combat (Phase 2) ----------------------------------------------------
 // Force of an owner = banked Balance + a bonus for sheer size, so a big empire
@@ -55,13 +55,13 @@ export const DEFENSE_FACTOR = 0.9;
 
 // --- Bots & difficulty (Phase 3) -----------------------------------------
 // Bots are first-class players (same rules), driven by a simple state AI.
-export const BOT_COUNT = 4;
-export const BOT_AGGRESSION = 0.45; // 0..1 — higher attacks sooner / nearer-equal
-export const ECO_SPEED = 1; // global income multiplier (game pace)
-export const DECISION_INTERVAL = 0.7; // seconds between a bot's AI decisions
+export const BOT_COUNT = 5;
+export const BOT_AGGRESSION = 0.6; // 0..1 — higher attacks sooner / nearer-equal
+export const ECO_SPEED = 1.4; // global income multiplier (game pace)
+export const DECISION_INTERVAL = 0.5; // seconds between a bot's AI decisions
 // Bots earn a fraction of the player's income so a competent human can out-grow
 // them — the player out-thinks; the AI doesn't out-economy.
-export const BOT_ECO_HANDICAP = 0.9;
+export const BOT_ECO_HANDICAP = 0.85;
 // A bot attacks a rival when its strength > rival strength * margin. Aggression
 // lerps the margin from BASE (cautious) down to MIN (reckless).
 export const ATTACK_MARGIN_BASE = 1.6;
@@ -71,12 +71,24 @@ export const DEFEND_RATIO = 1.0;
 // Cells lost since the last decision to count as "under attack".
 export const ATTACK_DETECT_CELLS = 3;
 
-// --- Spawns (Phase 3: distributed) ---------------------------------------
-export const SPAWN_MIN_DIST = 56; // min cell distance between spawn centres
+// --- Spawns (distributed) ------------------------------------------------
+export const SPAWN_MIN_DIST = 40; // min cell distance between spawn centres
 export const SPAWN_PLACE_TRIES = 4000; // rejection-sampling attempts
 
+// --- Power Nodes (signature mechanic) ------------------------------------
+// Scattered objectives. Holding a node's cell grants a big flat income bonus,
+// so the map is worth fighting over from second one and losing one is a swing.
+export const NODE_COUNT = 5;
+export const NODE_BONUS_INCOME = 28; // Balance/sec per node currently owned
+export const NODE_MIN_DIST = 34; // min cell distance between nodes (and spawns)
+
 // --- Win condition -------------------------------------------------------
-export const WIN_PERCENT = 0.6; // control this share of LAND to win the round
+export const WIN_PERCENT = 0.5; // control this share of LAND to win the round
+
+// --- Juice ---------------------------------------------------------------
+export const FLASH_DUR = 0.45; // seconds a freshly-conquered cell flashes white
+export const BORDER_TINT = 0.45; // 0..1 — how much front cells lighten (the glow)
+export const COLOR_NODE = 0xffe066; // neutral power-node ring (warm gold)
 
 // --- Colors (0xRRGGBB; packed to RGBA in render.ts) ----------------------
 // Reuse the repo AURORA night palette: warm ember is reserved for the player,

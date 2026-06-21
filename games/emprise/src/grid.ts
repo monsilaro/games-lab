@@ -14,6 +14,8 @@ import {
   BOT_COUNT,
   SPAWN_MIN_DIST,
   SPAWN_PLACE_TRIES,
+  NODE_COUNT,
+  NODE_MIN_DIST,
 } from './config';
 
 export interface Grid {
@@ -25,6 +27,8 @@ export interface Grid {
   ownedCount: Uint32Array;
   /** conquerable cells (non-water) — the denominator for "% of map owned". */
   landCount: number;
+  /** Power-node cell indices — holding one grants bonus income. Start neutral. */
+  nodes: Int32Array;
 }
 
 export function idx(x: number, y: number): number {
@@ -72,7 +76,10 @@ export function createGrid(seed = 1): Grid {
     stampZone(owner, ownedCount, spawns[s].x, spawns[s].y, START_ZONE_RADIUS, id);
   }
 
-  return { owner, balance, ownedCount, landCount: CELL_COUNT - waterCount };
+  // Power nodes: neutral cells out in the map, away from spawns and each other.
+  const nodes = placeNodes(seed, spawns, NODE_COUNT);
+
+  return { owner, balance, ownedCount, landCount: CELL_COUNT - waterCount, nodes };
 }
 
 interface Pt {
@@ -114,6 +121,44 @@ function placeSpawns(seed: number, count: number): Pt[] {
     pts.push({ x, y });
   }
   return pts;
+}
+
+/** Place `count` power-node cells out in the land, away from spawns and nodes. */
+function placeNodes(seed: number, spawns: Pt[], count: number): Int32Array {
+  const rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  const margin = WATER_BORDER_THICKNESS + 2;
+  const xLo = margin;
+  const xHi = GRID_W - 1 - margin;
+  const yLo = margin;
+  const yHi = GRID_H - 1 - margin;
+  const minD2 = NODE_MIN_DIST * NODE_MIN_DIST;
+  const pts: Pt[] = [];
+  let tries = 0;
+  while (pts.length < count && tries < SPAWN_PLACE_TRIES) {
+    tries++;
+    const x = xLo + Math.floor(rng() * (xHi - xLo + 1));
+    const y = yLo + Math.floor(rng() * (yHi - yLo + 1));
+    let ok = true;
+    for (let i = 0; i < spawns.length && ok; i++) {
+      const dx = spawns[i].x - x;
+      const dy = spawns[i].y - y;
+      if (dx * dx + dy * dy < minD2) ok = false;
+    }
+    for (let i = 0; i < pts.length && ok; i++) {
+      const dx = pts[i].x - x;
+      const dy = pts[i].y - y;
+      if (dx * dx + dy * dy < minD2) ok = false;
+    }
+    if (ok) pts.push({ x, y });
+  }
+  while (pts.length < count) {
+    const x = xLo + Math.floor(rng() * (xHi - xLo + 1));
+    const y = yLo + Math.floor(rng() * (yHi - yLo + 1));
+    pts.push({ x, y });
+  }
+  const out = new Int32Array(count);
+  for (let i = 0; i < count; i++) out[i] = idx(pts[i].x, pts[i].y);
+  return out;
 }
 
 /** Stamp a filled square of `id` centred at (cx,cy), skipping water/out-of-bounds. */

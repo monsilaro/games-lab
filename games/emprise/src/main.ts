@@ -3,23 +3,17 @@
 import { startGameLoop } from '@games-lab/shared';
 import { SIM_STEP, OWNER_PLAYER, WIN_PERCENT } from './config';
 import { createGrid, type Grid } from './grid';
-import {
-  createSim,
-  setTarget,
-  setGreedyNeutral,
-  simTick,
-  clearDirty,
-  type Sim,
-} from './sim';
+import { createSim, setTarget, setGreedyNeutral, simTick, clearDirty, type Sim } from './sim';
 import { aiStep } from './ai';
+import { createRenderer, renderFrame, clearFlash, layout, pointerToCell } from './render';
 import {
-  createRenderer,
-  paintFull,
-  applyDirty,
-  blit,
-  layout,
-  pointerToCell,
-} from './render';
+  initAudio,
+  sfxCapture,
+  sfxUnderAttack,
+  sfxNode,
+  sfxWin,
+  sfxLose,
+} from './audio';
 
 declare const __BUILD_INFO__: string;
 
@@ -36,7 +30,15 @@ let landCount = grid.landCount;
 let totalPlayers = sim.activeOwners.length;
 let running = true;
 let elapsed = 0;
+let lastPlayerOwned = grid.ownedCount[OWNER_PLAYER];
+let nodeOwners = snapshotNodeOwners();
 setGreedyNeutral(sim, OWNER_PLAYER); // auto-expand into neutral by default
+
+function snapshotNodeOwners(): Uint8Array {
+  const a = new Uint8Array(grid.nodes.length);
+  for (let n = 0; n < grid.nodes.length; n++) a[n] = grid.owner[grid.nodes[n]];
+  return a;
+}
 
 // --- canvas sizing (DPR capped at 2) -------------------------------------
 let cssW = 0;
@@ -56,12 +58,7 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
 resize();
 
-paintFull(renderer, grid);
-
 // --- input: HOLD/drag to focus a directed push (attack), RELEASE to auto-grow.
-// The player always auto-expands into neutral; holding aims a concentrated
-// push (and attacks whatever you aim at) so you have parity with the bots'
-// omnidirectional growth while keeping a touch-friendly single-finger control.
 let pointerDown = false;
 function steer(e: PointerEvent): void {
   if (!running) return;
@@ -70,10 +67,11 @@ function steer(e: PointerEvent): void {
 }
 function release(): void {
   pointerDown = false;
-  setGreedyNeutral(sim, OWNER_PLAYER); // back to omnidirectional auto-expand
+  setGreedyNeutral(sim, OWNER_PLAYER);
 }
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
+  initAudio();
   pointerDown = true;
   canvas.setPointerCapture(e.pointerId);
   steer(e);
@@ -90,7 +88,6 @@ canvas.addEventListener('pointerup', (e) => {
 canvas.addEventListener('pointercancel', () => {
   release();
 });
-// Belt-and-suspenders against iOS scroll/zoom gestures.
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
@@ -100,6 +97,7 @@ const pctEl = document.getElementById('emprise-hud-percent') as HTMLElement;
 const rivalsEl = document.getElementById('emprise-hud-rivals') as HTMLElement;
 const fpsEl = document.getElementById('emprise-hud-fps') as HTMLElement;
 const hintEl = document.getElementById('emprise-hint') as HTMLElement | null;
+const hurtEl = document.getElementById('emprise-hurt') as HTMLElement | null;
 const overlayEl = document.getElementById('emprise-end-overlay') as HTMLElement;
 const endTitleEl = document.getElementById('emprise-end-title') as HTMLElement;
 const endSubEl = document.getElementById('emprise-end-sub') as HTMLElement;
@@ -116,7 +114,14 @@ function dismissHint(): void {
 }
 canvas.addEventListener('pointerdown', dismissHint);
 
-/** Player's count, the biggest rival's count, and how many rivals are alive. */
+function hurtFlash(): void {
+  if (!hurtEl) return;
+  hurtEl.style.opacity = '0.5';
+  setTimeout(() => {
+    hurtEl.style.opacity = '0';
+  }, 60);
+}
+
 function snapshot(): { player: number; maxRival: number; rivals: number; rank: number } {
   const oc = grid.ownedCount;
   const player = oc[OWNER_PLAYER];
@@ -144,12 +149,12 @@ function endRound(win: boolean): void {
   running = false;
   const snap = snapshot();
   endTitleEl.textContent = win ? 'Empire' : 'Conquis';
-  endSubEl.textContent = win
-    ? 'La carte est à toi.'
-    : 'Ton territoire a été englouti.';
+  endSubEl.textContent = win ? 'La carte est à toi.' : 'Ton territoire a été englouti.';
   const pct = ((snap.player / landCount) * 100).toFixed(1);
   endStatsEl.textContent = `Territoire ${pct}%  ·  Rang ${snap.rank}/${totalPlayers}  ·  ${fmtTime(elapsed)}`;
   overlayEl.classList.add('emprise-end-active');
+  if (win) sfxWin();
+  else sfxLose();
 }
 
 function newGame(): void {
@@ -161,23 +166,25 @@ function newGame(): void {
   running = true;
   elapsed = 0;
   acc = 0;
+  lastPlayerOwned = grid.ownedCount[OWNER_PLAYER];
+  nodeOwners = snapshotNodeOwners();
+  clearFlash(renderer);
   overlayEl.classList.remove('emprise-end-active');
-  paintFull(renderer, grid);
 }
 restartBtn.addEventListener('click', (e) => {
   e.stopPropagation();
+  initAudio();
   newGame();
 });
 
 // --- loop: fixed-step sim, decoupled from render -------------------------
-const MAX_STEPS_PER_FRAME = 5; // spiral-of-death guard
+const MAX_STEPS_PER_FRAME = 5;
 let acc = 0;
 let fps = 60;
 let lastFrame = performance.now();
 let hudT = 0;
 
 startGameLoop((dt) => {
-  // True frame time for an honest fps readout (independent of the sim clamp).
   const now = performance.now();
   const frameMs = now - lastFrame;
   lastFrame = now;
@@ -188,26 +195,24 @@ startGameLoop((dt) => {
     acc += dt;
     let steps = 0;
     while (acc >= SIM_STEP && steps < MAX_STEPS_PER_FRAME) {
-      aiStep(sim, SIM_STEP); // bots decide, then the world ticks
+      aiStep(sim, SIM_STEP);
       simTick(sim, SIM_STEP);
       acc -= SIM_STEP;
       steps++;
     }
-    if (acc > SIM_STEP) acc = 0; // drop backlog rather than spiral
+    if (acc > SIM_STEP) acc = 0;
 
-    // Round end: you win by control %, lose if wiped or a rival takes the map.
     const snap = snapshot();
     if (snap.player === 0) endRound(false);
     else if (snap.player / landCount >= WIN_PERCENT || snap.rivals === 0) endRound(true);
     else if (snap.maxRival / landCount >= WIN_PERCENT) endRound(false);
   }
 
-  // Render: changed cells → offscreen, then one scaled blit.
-  applyDirty(renderer, sim);
+  // Render every frame (juice keeps animating under the end overlay too).
+  renderFrame(renderer, sim, grid, dt, now / 1000);
   clearDirty(sim);
-  blit(renderer, cssW, cssH);
 
-  // HUD (throttled ~5×/s).
+  // HUD + audio events (throttled ~5×/s).
   hudT += dt;
   if (hudT >= 0.2) {
     hudT = 0;
@@ -216,5 +221,31 @@ startGameLoop((dt) => {
     pctEl.textContent = `${((snap.player / landCount) * 100).toFixed(1)}%`;
     rivalsEl.textContent = snap.rivals.toString();
     fpsEl.textContent = Math.round(fps).toString();
+
+    if (running) {
+      const delta = snap.player - lastPlayerOwned;
+      lastPlayerOwned = snap.player;
+      if (delta >= 15) sfxCapture(Math.min(delta / 200, 1));
+      else if (delta <= -8) {
+        sfxUnderAttack();
+        hurtFlash();
+      }
+      checkNodes();
+    }
   }
 });
+
+// Power-node ownership changes → reward / alarm feedback.
+function checkNodes(): void {
+  for (let n = 0; n < grid.nodes.length; n++) {
+    const o = grid.owner[grid.nodes[n]];
+    if (o === nodeOwners[n]) continue;
+    const prev = nodeOwners[n];
+    nodeOwners[n] = o;
+    if (o === OWNER_PLAYER) sfxNode();
+    else if (prev === OWNER_PLAYER) {
+      sfxUnderAttack();
+      hurtFlash();
+    }
+  }
+}

@@ -164,6 +164,21 @@
         background: #ffd166;
       }
 
+      /* Under-attack red vignette (flashed from JS). */
+      #emprise-hurt {
+        position: fixed;
+        inset: 0;
+        z-index: 8;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.45s ease;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(255, 40, 40, 0) 45%,
+          rgba(255, 30, 30, 0.55) 100%
+        );
+      }
+
       #emprise-build-stamp {
         position: fixed;
         z-index: 5;
@@ -178,6 +193,7 @@
   </head>
   <body>
     <canvas id="emprise-game-canvas"></canvas>
+    <div id="emprise-hurt"></div>
 
     <div class="emprise-hud">
       <div class="emprise-stat">

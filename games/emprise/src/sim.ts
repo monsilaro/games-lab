@@ -26,6 +26,7 @@ import {
   DEFENSE_FACTOR,
   ECO_SPEED,
   BOT_ECO_HANDICAP,
+  NODE_BONUS_INCOME,
   DECISION_INTERVAL,
 } from './config';
 import type { Grid } from './grid';
@@ -60,6 +61,8 @@ export interface Sim {
   botState: Uint8Array;
   decisionTimer: Float32Array;
   lastOwned: Uint32Array;
+  /** Per-owner power-node income tallied each tick (scratch). */
+  nodeIncome: Float32Array;
 }
 
 export function createSim(grid: Grid): Sim {
@@ -79,6 +82,7 @@ export function createSim(grid: Grid): Sim {
     botState: new Uint8Array(MAX_OWNERS),
     decisionTimer: new Float32Array(MAX_OWNERS),
     lastOwned: new Uint32Array(MAX_OWNERS),
+    nodeIncome: new Float32Array(MAX_OWNERS),
   };
 
   // Seed every owner's frontier once (the only full-grid scan — at boot).
@@ -148,6 +152,15 @@ export function simTick(sim: Sim, dt: number): void {
   const grid = sim.grid;
   const active = sim.activeOwners;
 
+  // Tally power-node income per owner (just a few nodes).
+  const nodeIncome = sim.nodeIncome;
+  nodeIncome.fill(0);
+  const nodes = grid.nodes;
+  for (let n = 0; n < nodes.length; n++) {
+    const no = grid.owner[nodes[n]];
+    if (no !== OWNER_NEUTRAL && no !== OWNER_WATER) nodeIncome[no] += NODE_BONUS_INCOME;
+  }
+
   // Economy: every owner's income scales with its area; Balance is soft-capped.
   for (let a = 0; a < active.length; a++) {
     const o = active[a];
@@ -155,6 +168,7 @@ export function simTick(sim: Sim, dt: number): void {
     if (owned === 0) continue;
     let income = (BASE_INCOME_PER_SEC + BALANCE_PER_CELL_PER_SEC * owned) * ECO_SPEED;
     if (o !== OWNER_PLAYER) income *= BOT_ECO_HANDICAP; // bots out-thought, not out-economied
+    income += nodeIncome[o]; // power nodes — a flat, swingy bonus
     const cap = BALANCE_CAP_BASE + BALANCE_CAP_PER_CELL * owned;
     let bal = grid.balance[o] + income * dt;
     if (bal > cap) bal = cap;
