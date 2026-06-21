@@ -1,6 +1,12 @@
 // Emprise — boot, canvas/DPR sizing, fixed-step loop, touch input, HUD, rounds.
 
-import { startGameLoop } from '@games-lab/shared';
+import {
+  startGameLoop,
+  submitScore,
+  showLeaderboard,
+  promptPlayerName,
+  getStoredPlayerName,
+} from '@games-lab/shared';
 import { SIM_STEP, OWNER_PLAYER, WIN_PERCENT } from './config';
 import { createGrid, type Grid } from './grid';
 import { createSim, setTarget, setGreedyNeutral, simTick, clearDirty, type Sim } from './sim';
@@ -31,7 +37,11 @@ let totalPlayers = sim.activeOwners.length;
 let running = true;
 let elapsed = 0;
 let lastPlayerOwned = grid.ownedCount[OWNER_PLAYER];
+let peakCells = grid.ownedCount[OWNER_PLAYER];
+let lastScore = 0;
 let nodeOwners = snapshotNodeOwners();
+
+const LEADERBOARD_GAME = 'emprise';
 setGreedyNeutral(sim, OWNER_PLAYER); // auto-expand into neutral by default
 
 function snapshotNodeOwners(): Uint8Array {
@@ -101,8 +111,10 @@ const hurtEl = document.getElementById('emprise-hurt') as HTMLElement | null;
 const overlayEl = document.getElementById('emprise-end-overlay') as HTMLElement;
 const endTitleEl = document.getElementById('emprise-end-title') as HTMLElement;
 const endSubEl = document.getElementById('emprise-end-sub') as HTMLElement;
+const endScoreEl = document.getElementById('emprise-end-score') as HTMLElement;
 const endStatsEl = document.getElementById('emprise-end-stats') as HTMLElement;
 const restartBtn = document.getElementById('emprise-restart-btn') as HTMLButtonElement;
+const leaderboardBtn = document.getElementById('emprise-leaderboard-btn') as HTMLButtonElement;
 const stampEl = document.getElementById('emprise-build-stamp');
 if (stampEl) stampEl.textContent = __BUILD_INFO__;
 
@@ -148,13 +160,34 @@ function fmtTime(s: number): string {
 function endRound(win: boolean): void {
   running = false;
   const snap = snapshot();
+  const peakPct = (peakCells / landCount) * 100;
+  lastScore = scoreFor(win, peakPct, elapsed);
   endTitleEl.textContent = win ? 'Empire' : 'Conquis';
   endSubEl.textContent = win ? 'La carte est à toi.' : 'Ton territoire a été englouti.';
-  const pct = ((snap.player / landCount) * 100).toFixed(1);
-  endStatsEl.textContent = `Territoire ${pct}%  ·  Rang ${snap.rank}/${totalPlayers}  ·  ${fmtTime(elapsed)}`;
+  endScoreEl.textContent = `Score ${lastScore.toLocaleString('fr-FR')}`;
+  endStatsEl.textContent = `Pic ${peakPct.toFixed(1)}%  ·  Rang ${snap.rank}/${totalPlayers}  ·  ${fmtTime(elapsed)}`;
   overlayEl.classList.add('emprise-end-active');
   if (win) sfxWin();
   else sfxLose();
+  void submitEmpriseScore(lastScore, win, peakPct);
+}
+
+// Score rewards winning first, then peak territory, then speed (win) /
+// survival (loss). A win always outranks a loss.
+function scoreFor(win: boolean, peakPct: number, timeSec: number): number {
+  if (win) return 10000 + Math.round(peakPct * 50) + Math.max(0, Math.round((180 - timeSec) * 30));
+  return Math.round(peakPct * 80) + Math.round(timeSec * 5);
+}
+
+async function submitEmpriseScore(score: number, win: boolean, peakPct: number): Promise<void> {
+  const name = await promptPlayerName();
+  if (!name) return;
+  await submitScore(LEADERBOARD_GAME, name, score, {
+    win,
+    pct: Math.round(peakPct * 10) / 10,
+    time: Math.round(elapsed),
+    build: __BUILD_INFO__,
+  });
 }
 
 function newGame(): void {
@@ -167,6 +200,7 @@ function newGame(): void {
   elapsed = 0;
   acc = 0;
   lastPlayerOwned = grid.ownedCount[OWNER_PLAYER];
+  peakCells = grid.ownedCount[OWNER_PLAYER];
   nodeOwners = snapshotNodeOwners();
   clearFlash(renderer);
   overlayEl.classList.remove('emprise-end-active');
@@ -175,6 +209,15 @@ restartBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   initAudio();
   newGame();
+});
+leaderboardBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  initAudio();
+  showLeaderboard(LEADERBOARD_GAME, {
+    title: 'Emprise — Top',
+    playerName: getStoredPlayerName(),
+    highlightScore: lastScore,
+  });
 });
 
 // --- loop: fixed-step sim, decoupled from render -------------------------
@@ -203,6 +246,7 @@ startGameLoop((dt) => {
     if (acc > SIM_STEP) acc = 0;
 
     const snap = snapshot();
+    if (snap.player > peakCells) peakCells = snap.player;
     if (snap.player === 0) endRound(false);
     else if (snap.player / landCount >= WIN_PERCENT || snap.rivals === 0) endRound(true);
     else if (snap.maxRival / landCount >= WIN_PERCENT) endRound(false);
