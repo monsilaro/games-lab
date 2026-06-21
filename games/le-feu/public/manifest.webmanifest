@@ -1,0 +1,15 @@
+{
+  "name": "Le Feu",
+  "short_name": "Le Feu",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0A1128",
+  "theme_color": "#0A1128",
+  "icons": [
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

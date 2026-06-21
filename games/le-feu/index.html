@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Le Feu" />
+    <meta name="theme-color" content="#0A1128" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
+    <title>Le Feu</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #0a1128;
+        font-family: -apple-system, system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        touch-action: none;
+        z-index: 0;
+      }
+      /* Top-left: day + phase pill. ids prefixed le-feu- to dodge ad-block cosmetic filters. */
+      #le-feu-clock {
+        position: fixed;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        left: calc(env(safe-area-inset-left, 0px) + 12px);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        pointer-events: none;
+      }
+      #le-feu-day {
+        font-size: 22px;
+        font-weight: 800;
+        color: #e8edf2;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+      }
+      #le-feu-phase {
+        align-self: flex-start;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 999px;
+        color: #0a1128;
+        background: #ff9f1c;
+      }
+      /* Bottom: speed cluster + build toggle. */
+      #le-feu-controls {
+        position: fixed;
+        z-index: 10;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .le-feu-btn {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 16px;
+        font-weight: 800;
+        min-width: 46px;
+        height: 46px;
+        padding: 0 10px;
+        border-radius: 12px;
+        color: #e8edf2;
+        background: rgba(28, 37, 65, 0.85);
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+      }
+      .le-feu-btn.le-feu-on {
+        color: #0a1128;
+        background: #2ec4b6;
+      }
+      #le-feu-build.le-feu-on {
+        color: #0a1128;
+        background: #ff9f1c;
+      }
+      #le-feu-build-hint {
+        position: fixed;
+        z-index: 10;
+        left: 0;
+        right: 0;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+        text-align: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: #e8edf2;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+        display: none;
+      }
+      #le-feu-build-stamp {
+        position: fixed;
+        z-index: 10;
+        right: calc(env(safe-area-inset-right, 0px) + 8px);
+        top: calc(env(safe-area-inset-top, 0px) + 8px);
+        font-size: 10px;
+        color: rgba(232, 237, 242, 0.45);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="le-feu-clock">
+      <div id="le-feu-day">Jour 1</div>
+      <div id="le-feu-phase">Jour</div>
+    </div>
+    <div id="le-feu-build-hint">Touche une case libre pour bâtir · retouche 🔨 pour annuler</div>
+    <div id="le-feu-controls">
+      <button class="le-feu-btn" id="le-feu-pause" type="button">⏸</button>
+      <button class="le-feu-btn le-feu-on" id="le-feu-x1" type="button">×1</button>
+      <button class="le-feu-btn" id="le-feu-x2" type="button">×2</button>
+      <button class="le-feu-btn" id="le-feu-x3" type="button">×3</button>
+      <button class="le-feu-btn" id="le-feu-build" type="button">🔨</button>
+    </div>
+    <div id="le-feu-build-stamp"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

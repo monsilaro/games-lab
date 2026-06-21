@@ -28,6 +28,7 @@ From prompt to playable build on device in about a minute.
 |SynthRider 3D|Retro-synthwave lane-dodge runner — ride the neon grid at warp speed|[▶️](https://monsilaro.github.io/games-lab/synth-rider/)|
 |Space Invaders|Classic arcade shooter — drag to move, tap to fire, defeat waves of aliens|[▶️](https://monsilaro.github.io/games-lab/space-invaders/)|
 |Emprise|Pixel territorial conquest (territorial.io-like) — touch & drag to flood-fill an empire over a 40k-cell grid|[▶️](https://monsilaro.github.io/games-lab/emprise/)|
+|Le Feu|Colony sim of survival around the campfire (Bonfire-like) — Québécois folklore, day/night cycle, pan/pinch diorama. Phase 1: living campement|[▶️](https://monsilaro.github.io/games-lab/le-feu/)|
 
 *(New prototypes appear on the arcade index automatically.)*
 

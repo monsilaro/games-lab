@@ -1,0 +1,146 @@
+// Le Feu — all tuning lives here. No magic numbers in the systems; everything a
+// designer would touch (grid, sim rate, cycle lengths, light rig, palette,
+// villager/building stats) is a named constant in this file. Phase 1 scope:
+// campement + day/night cycle. Resources/combat/expeditions land in later phases.
+import * as THREE from 'three';
+import { AURORA } from '@games-lab/shared';
+
+// --- Palette ---------------------------------------------------------------
+// Reuse the shared AURORA names (spec palette is AURORA verbatim) plus a couple
+// of le-feu-local earth tones. ember = the fire = the only strong warm color.
+export const PALETTE = {
+  night: AURORA.night, // 0x0a1128 darkest sky / deep night
+  dusk: AURORA.deepBlue, // 0x1c2541 day-sky / dusk floor
+  fire: AURORA.ember, // 0xff9f1c the central fire
+  fireHot: AURORA.emberLight, // 0xffd166 inner flame / torch tip
+  snow: AURORA.snow, // 0xe8edf2 snow ground band
+  wood: 0x8b5a2b, // logs, hut walls
+  woodDark: 0x5e3d1d, // hut frame / shadow tone
+  ground: 0x24304f, // island top (cold lit lambert)
+  groundEdge: 0x161f38, // island cliff sides
+  water: 0x0c1733, // surrounding sea
+  aurora: AURORA.auroraGreen, // 0x2ec4b6 supernatural accent (later phases)
+  violet: AURORA.violet, // 0x9d4edd second supernatural accent
+  skin: 0xd9a679, // villager faces/hands
+} as const;
+
+// Tuque color variants so the crowd reads as distinct people.
+export const TUQUE_COLORS = [0xc1121f, 0x2ec4b6, 0x9d4edd, 0xffd166, 0x3a86ff, 0xe8edf2] as const;
+
+// --- Light rig (mirrors Veillée's "Nuit de veillée" look) ------------------
+// Two ambient/directional targets that the day/night clock lerps between, plus
+// the central FIRE point light which is always warm and pulses at night.
+export const LIGHTS = {
+  // Cold directional "moon" — winter sky. Brighter by day, dimmer at night.
+  moon: {
+    color: 0xbcd2ff,
+    position: new THREE.Vector3(-14, 26, 10),
+    dayIntensity: 1.15,
+    nightIntensity: 0.22,
+  },
+  // Deep-blue fill. Lighter by day so the camp is readable; near-black at night.
+  ambient: {
+    dayColor: 0x6b7da8,
+    nightColor: 0x141d33,
+    dayIntensity: 0.85,
+    nightIntensity: 0.32,
+  },
+  // The hearth. Warm point light at camp centre — the showpiece.
+  fire: {
+    color: PALETTE.fire,
+    dayIntensity: 1.6, // still visible by day, but the moon dominates
+    nightIntensity: 8.5, // at night it (and torches) are the only real source
+    distance: 30,
+    decay: 1.4,
+    height: 2.2, // y of the light above the logs
+    flickerAmp: 0.12, // ± fraction of intensity, fast pulse
+    flickerHz: 7,
+  },
+  // Per-villager handheld torch, lit only at night.
+  torch: {
+    color: PALETTE.fireHot,
+    intensity: 2.6,
+    distance: 6,
+    decay: 1.6,
+  },
+} as const;
+
+// Sky clear-color endpoints (lerped by the clock).
+export const SKY = {
+  day: 0x24304f, // cold lit blue-grey
+  night: PALETTE.night, // deep night
+} as const;
+
+// --- Camera (tilted ortho diorama) -----------------------------------------
+// Frustum is sized to FIT a target radius of the world on screen regardless of
+// orientation (portrait phones are narrow, so we must drive the frustum from the
+// width need, not a fixed height — otherwise the island spills off-screen). See
+// camera.ts apply(). `seedHeight` is only the bootstrap value handed to
+// createOrthoApp before the controller takes over on the first frame.
+export const CAMERA = {
+  seedHeight: 30,
+  // Offset from the look target: above and behind → steep diorama tilt.
+  offset: new THREE.Vector3(0, 22, 17),
+  // Half-extent (world units) we guarantee visible around the look target at
+  // zoom 1. Island world radius is islandRadius*cell ≈ 12, so 13.5 frames it +margin.
+  fitRadius: 13.5,
+  // Ground depth (z) is foreshortened by the tilt; this is roughly sin(pitch).
+  depthFactor: 0.8,
+  minZoom: 0.5, // zoomed IN (smaller frustum → closer on the fire)
+  maxZoom: 1.4, // zoomed OUT (whole island + sea margin)
+  panClampMargin: 5, // how far past island edge the look target may pan (units)
+  far: 160,
+} as const;
+
+// --- Simulation ------------------------------------------------------------
+export const SIM_HZ = 30;
+export const SIM_STEP = 1 / SIM_HZ;
+export const MAX_STEPS_PER_FRAME = 5; // spiral-of-death guard (emprise idiom)
+export const SPEEDS = [0, 1, 2, 3] as const; // pause / ×1 / ×2 / ×3
+
+// --- Grid + island ---------------------------------------------------------
+export const GRID = {
+  size: 19, // cells per side (odd → a true centre cell for the fire)
+  cell: 1.5, // world units per cell
+  islandRadius: 8.0, // cells from centre that are land (round mask) → ~12u radius
+} as const;
+
+// Cell occupancy codes (Uint8Array).
+export const CELL_OFFISLAND = 2; // water / not buildable
+export const CELL_FREE = 0;
+export const CELL_OCCUPIED = 1;
+
+// --- Day / night cycle -----------------------------------------------------
+// One full day = day + dusk + night + dawn. Durations in *sim seconds* at ×1.
+export const CYCLE = {
+  day: 30,
+  dusk: 5,
+  night: 24,
+  dawn: 5,
+} as const;
+export const CYCLE_TOTAL = CYCLE.day + CYCLE.dusk + CYCLE.night + CYCLE.dawn;
+
+// --- Villagers -------------------------------------------------------------
+export const VILLAGER = {
+  startCount: 7,
+  speed: 2.4, // world units / sec while walking
+  arriveDist: 0.18, // distance to target that counts as arrived (units)
+  wanderPauseMin: 1.2, // idle seconds between day wander hops
+  wanderPauseMax: 3.5,
+  fireRingMin: 1.8, // night: gather on a ring this far from fire centre (units)
+  fireRingMax: 3.4,
+  walkBobHz: 9, // procedural walk bob frequency
+  walkBobAmp: 0.08, // vertical bob amplitude (units)
+  scale: 1.0,
+} as const;
+
+// --- Buildings (Phase 1: only the test hut; fire is special, see fire.ts) ---
+export interface BuildingDef {
+  id: string;
+  name: string;
+  footprint: number; // cells (1 = single cell)
+  color: number;
+}
+export const BUILDINGS: Record<string, BuildingDef> = {
+  hut: { id: 'hut', name: 'Hutte', footprint: 1, color: PALETTE.wood },
+};
