@@ -2,15 +2,15 @@
 // Works on the FRONT only (a global border-cell queue shared by every owner),
 // never a full-grid rescan per tick, and allocates nothing in the hot loop.
 //
-// Phase 2: player (tap/drag steered) + passive-defender enemies. Conquest is
-// symmetric and force-based — attacking a stronger owner is expensive, so
-// overextension gets punished by the defender's counter-attack with no
-// special-case "recede" code.
+// Phase 3: every owner (player + bots) is a first-class actor with its own
+// behavior `mode` and target. The player's mode is set by touch; bots' modes
+// are set by the AI (see ai.ts). Conquest is symmetric and force-based.
 
 import {
   GRID_W,
   GRID_H,
   CELL_COUNT,
+  MAX_OWNERS,
   OWNER_NEUTRAL,
   OWNER_PLAYER,
   OWNER_WATER,
@@ -24,9 +24,15 @@ import {
   STRENGTH_SIZE_FACTOR,
   ATTACK_COST_BASE,
   DEFENSE_FACTOR,
-  ENEMY_DEFENSIVE,
+  ECO_SPEED,
+  DECISION_INTERVAL,
 } from './config';
 import type { Grid } from './grid';
+
+// Behavior modes (per owner).
+export const MODE_IDLE = 0; // bank Balance, don't push (player untouched / bot DEFEND)
+export const MODE_DIRECTED = 1; // advance the front toward target[o] (steer / ATTACK)
+export const MODE_GREEDY = 2; // grab every affordable fringe cell, no direction (EXPAND)
 
 export interface Sim {
   grid: Grid;
@@ -44,10 +50,14 @@ export interface Sim {
   dirtyLen: number;
   /** Owner ids with ≥1 cell at boot, ascending (player first) — fixed process order. */
   activeOwners: number[];
-  /** Current player expansion target (cell coords). Persists until re-tapped. */
-  targetX: number;
-  targetY: number;
-  hasTarget: boolean;
+  /** Per-owner behavior + target (cell coords). */
+  mode: Uint8Array;
+  targetX: Int32Array;
+  targetY: Int32Array;
+  /** Per-bot AI scratch (see ai.ts): last decision's state, timer, owned count. */
+  botState: Uint8Array;
+  decisionTimer: Float32Array;
+  lastOwned: Uint32Array;
 }
 
 export function createSim(grid: Grid): Sim {
@@ -61,9 +71,12 @@ export function createSim(grid: Grid): Sim {
     dirty: new Int32Array(CELL_COUNT),
     dirtyLen: 0,
     activeOwners: [],
-    targetX: 0,
-    targetY: 0,
-    hasTarget: false,
+    mode: new Uint8Array(MAX_OWNERS),
+    targetX: new Int32Array(MAX_OWNERS),
+    targetY: new Int32Array(MAX_OWNERS),
+    botState: new Uint8Array(MAX_OWNERS),
+    decisionTimer: new Float32Array(MAX_OWNERS),
+    lastOwned: new Uint32Array(MAX_OWNERS),
   };
 
   // Seed every owner's frontier once (the only full-grid scan — at boot).
@@ -81,17 +94,40 @@ export function createSim(grid: Grid): Sim {
     if (grid.ownedCount[id] > 0) sim.activeOwners.push(id);
   }
 
+  // Init AI scratch: stagger bot decision timers so they don't all fire on one
+  // tick; seed lastOwned for attack detection.
+  let botIndex = 0;
+  let botTotal = 0;
+  for (const o of sim.activeOwners) if (o !== OWNER_PLAYER) botTotal++;
+  for (const o of sim.activeOwners) {
+    sim.lastOwned[o] = grid.ownedCount[o];
+    if (o !== OWNER_PLAYER) {
+      sim.decisionTimer[o] = botTotal > 0 ? (DECISION_INTERVAL * botIndex) / botTotal : 0;
+      botIndex++;
+    }
+  }
+
   return sim;
 }
 
-export function setTarget(sim: Sim, cx: number, cy: number): void {
-  sim.targetX = cx;
-  sim.targetY = cy;
-  sim.hasTarget = true;
+// --- per-owner behavior setters (used by main for the player, by ai for bots) ---
+export function setTarget(sim: Sim, o: number, cx: number, cy: number): void {
+  sim.mode[o] = MODE_DIRECTED;
+  sim.targetX[o] = cx;
+  sim.targetY[o] = cy;
+}
+export function setGreedy(sim: Sim, o: number): void {
+  sim.mode[o] = MODE_GREEDY;
+}
+export function setIdle(sim: Sim, o: number): void {
+  sim.mode[o] = MODE_IDLE;
+}
+export function clearTarget(sim: Sim, o: number): void {
+  sim.mode[o] = MODE_IDLE;
 }
 
-export function clearTarget(sim: Sim): void {
-  sim.hasTarget = false;
+export function strengthOf(sim: Sim, o: number): number {
+  return sim.grid.balance[o] + STRENGTH_SIZE_FACTOR * sim.grid.ownedCount[o];
 }
 
 // Drain the renderer's change list after it has consumed `dirty`.
@@ -99,7 +135,8 @@ export function clearDirty(sim: Sim): void {
   sim.dirtyLen = 0;
 }
 
-// --- one fixed step ------------------------------------------------------
+// --- one fixed step (economy + front processing). AI runs separately (ai.ts,
+//     called from the main loop before this) to keep sim.ts cycle-free. -------
 export function simTick(sim: Sim, dt: number): void {
   compactBorder(sim);
 
@@ -111,7 +148,7 @@ export function simTick(sim: Sim, dt: number): void {
     const o = active[a];
     const owned = grid.ownedCount[o];
     if (owned === 0) continue;
-    const income = BASE_INCOME_PER_SEC + BALANCE_PER_CELL_PER_SEC * owned;
+    const income = (BASE_INCOME_PER_SEC + BALANCE_PER_CELL_PER_SEC * owned) * ECO_SPEED;
     const cap = BALANCE_CAP_BASE + BALANCE_CAP_PER_CELL * owned;
     let bal = grid.balance[o] + income * dt;
     if (bal > cap) bal = cap;
@@ -163,9 +200,8 @@ function cmpDistToTarget(a: number, b: number): number {
 
 /** Advance one owner's front by up to MAX_CONVERSIONS_PER_TICK affordable cells. */
 function processOwner(sim: Sim, o: number): void {
-  // The player only acts while steering; enemies (defensive) always react.
-  if (o === OWNER_PLAYER && !sim.hasTarget) return;
-  const defensive = o !== OWNER_PLAYER && ENEMY_DEFENSIVE;
+  const m = sim.mode[o];
+  if (m === MODE_IDLE) return;
 
   const grid = sim.grid;
   const owner = grid.owner;
@@ -174,7 +210,7 @@ function processOwner(sim: Sim, o: number): void {
   const fringe = sim.fringe;
   const fringeMark = sim.fringeMark;
 
-  // 1. Gather this owner's conquerable targets (deduped).
+  // 1. Gather this owner's conquerable targets (neutral + enemy, deduped).
   let fl = 0;
   const len = sim.borderLen;
   for (let i = 0; i < len; i++) {
@@ -182,18 +218,18 @@ function processOwner(sim: Sim, o: number): void {
     if (!isBorder[c] || owner[c] !== o) continue;
     const x = c % GRID_W;
     const y = (c / GRID_W) | 0;
-    if (x > 0) fl = addTarget(sim, fringe, fl, c - 1, o, defensive);
-    if (x < GRID_W - 1) fl = addTarget(sim, fringe, fl, c + 1, o, defensive);
-    if (y > 0) fl = addTarget(sim, fringe, fl, c - GRID_W, o, defensive);
-    if (y < GRID_H - 1) fl = addTarget(sim, fringe, fl, c + GRID_W, o, defensive);
+    if (x > 0) fl = addTarget(sim, fringe, fl, c - 1, o);
+    if (x < GRID_W - 1) fl = addTarget(sim, fringe, fl, c + 1, o);
+    if (y > 0) fl = addTarget(sim, fringe, fl, c - GRID_W, o);
+    if (y < GRID_H - 1) fl = addTarget(sim, fringe, fl, c + GRID_W, o);
   }
 
   if (fl === 0) return;
 
-  // 2. Player steers: take the cells nearest the target first (directional).
-  if (o === OWNER_PLAYER) {
-    cmpTx = sim.targetX;
-    cmpTy = sim.targetY;
+  // 2. Directed owners take the cells nearest their target first.
+  if (m === MODE_DIRECTED) {
+    cmpTx = sim.targetX[o];
+    cmpTy = sim.targetY[o];
     fringe.subarray(0, fl).sort(cmpDistToTarget);
   }
 
@@ -213,18 +249,10 @@ function processOwner(sim: Sim, o: number): void {
   for (let k = 0; k < fl; k++) fringeMark[fringe[k]] = 0;
 }
 
-/** Add `t` to `o`'s target list if conquerable by `o` (and not yet marked). */
-function addTarget(
-  sim: Sim,
-  fringe: Int32Array,
-  fl: number,
-  t: number,
-  o: number,
-  defensive: boolean,
-): number {
+/** Add `t` to `o`'s target list if conquerable by `o` (neutral or enemy). */
+function addTarget(sim: Sim, fringe: Int32Array, fl: number, t: number, o: number): number {
   const od = sim.grid.owner[t];
   if (od === o || od === OWNER_WATER) return fl;
-  if (od === OWNER_NEUTRAL && defensive) return fl; // defenders ignore neutral
   if (sim.fringeMark[t]) return fl;
   sim.fringeMark[t] = 1;
   fringe[fl] = t;

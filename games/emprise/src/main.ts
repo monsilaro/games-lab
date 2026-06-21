@@ -1,9 +1,10 @@
 // Emprise — boot, canvas/DPR sizing, fixed-step loop, touch input, HUD, rounds.
 
 import { startGameLoop } from '@games-lab/shared';
-import { SIM_STEP, OWNER_PLAYER } from './config';
+import { SIM_STEP, OWNER_PLAYER, WIN_PERCENT } from './config';
 import { createGrid, type Grid } from './grid';
-import { createSim, setTarget, simTick, clearDirty, clearTarget, type Sim } from './sim';
+import { createSim, setTarget, clearTarget, simTick, clearDirty, type Sim } from './sim';
+import { aiStep } from './ai';
 import {
   createRenderer,
   paintFull,
@@ -18,10 +19,16 @@ declare const __BUILD_INFO__: string;
 const canvas = document.getElementById('emprise-game-canvas') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 
-let grid: Grid = createGrid();
+function nextSeed(): number {
+  return Date.now() >>> 0;
+}
+
+let grid: Grid = createGrid(nextSeed());
 let sim: Sim = createSim(grid);
 let landCount = grid.landCount;
+let totalPlayers = sim.activeOwners.length;
 let running = true;
+let elapsed = 0;
 
 // --- canvas sizing (DPR capped at 2) -------------------------------------
 let cssW = 0;
@@ -43,12 +50,12 @@ resize();
 
 paintFull(renderer, grid);
 
-// --- input: tap/drag steers the expansion target -------------------------
+// --- input: tap/drag steers the player's expansion target ----------------
 let pointerDown = false;
 function steer(e: PointerEvent): void {
   if (!running) return;
   const cell = pointerToCell(renderer, e.clientX, e.clientY);
-  if (cell) setTarget(sim, cell.x, cell.y);
+  if (cell) setTarget(sim, OWNER_PLAYER, cell.x, cell.y);
 }
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
@@ -81,6 +88,7 @@ const hintEl = document.getElementById('emprise-hint') as HTMLElement | null;
 const overlayEl = document.getElementById('emprise-end-overlay') as HTMLElement;
 const endTitleEl = document.getElementById('emprise-end-title') as HTMLElement;
 const endSubEl = document.getElementById('emprise-end-sub') as HTMLElement;
+const endStatsEl = document.getElementById('emprise-end-stats') as HTMLElement;
 const restartBtn = document.getElementById('emprise-restart-btn') as HTMLButtonElement;
 const stampEl = document.getElementById('emprise-build-stamp');
 if (stampEl) stampEl.textContent = __BUILD_INFO__;
@@ -93,30 +101,50 @@ function dismissHint(): void {
 }
 canvas.addEventListener('pointerdown', dismissHint);
 
-function rivalsAlive(): number {
-  let n = 0;
+/** Player's count, the biggest rival's count, and how many rivals are alive. */
+function snapshot(): { player: number; maxRival: number; rivals: number; rank: number } {
+  const oc = grid.ownedCount;
+  const player = oc[OWNER_PLAYER];
+  let maxRival = 0;
+  let rivals = 0;
+  let rank = 1;
   for (let a = 0; a < sim.activeOwners.length; a++) {
     const o = sim.activeOwners[a];
-    if (o !== OWNER_PLAYER && grid.ownedCount[o] > 0) n++;
+    if (o === OWNER_PLAYER) continue;
+    const n = oc[o];
+    if (n > 0) rivals++;
+    if (n > maxRival) maxRival = n;
+    if (n > player) rank++;
   }
-  return n;
+  return { player, maxRival, rivals, rank };
+}
+
+function fmtTime(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
 function endRound(win: boolean): void {
   running = false;
-  endTitleEl.textContent = win ? 'Empire total' : 'Conquis';
+  const snap = snapshot();
+  endTitleEl.textContent = win ? 'Empire' : 'Conquis';
   endSubEl.textContent = win
-    ? 'Tous tes rivaux sont tombés.'
+    ? 'La carte est à toi.'
     : 'Ton territoire a été englouti.';
+  const pct = ((snap.player / landCount) * 100).toFixed(1);
+  endStatsEl.textContent = `Territoire ${pct}%  ·  Rang ${snap.rank}/${totalPlayers}  ·  ${fmtTime(elapsed)}`;
   overlayEl.classList.add('emprise-end-active');
 }
 
 function newGame(): void {
-  grid = createGrid();
+  grid = createGrid(nextSeed());
   sim = createSim(grid);
   landCount = grid.landCount;
-  clearTarget(sim);
+  totalPlayers = sim.activeOwners.length;
+  clearTarget(sim, OWNER_PLAYER);
   running = true;
+  elapsed = 0;
   acc = 0;
   overlayEl.classList.remove('emprise-end-active');
   paintFull(renderer, grid);
@@ -141,18 +169,22 @@ startGameLoop((dt) => {
   if (frameMs > 0) fps += (1000 / frameMs - fps) * 0.1;
 
   if (running) {
+    elapsed += dt;
     acc += dt;
     let steps = 0;
     while (acc >= SIM_STEP && steps < MAX_STEPS_PER_FRAME) {
+      aiStep(sim, SIM_STEP); // bots decide, then the world ticks
       simTick(sim, SIM_STEP);
       acc -= SIM_STEP;
       steps++;
     }
     if (acc > SIM_STEP) acc = 0; // drop backlog rather than spiral
 
-    // Round end.
-    if (grid.ownedCount[OWNER_PLAYER] === 0) endRound(false);
-    else if (rivalsAlive() === 0) endRound(true);
+    // Round end: you win by control %, lose if wiped or a rival takes the map.
+    const snap = snapshot();
+    if (snap.player === 0) endRound(false);
+    else if (snap.player / landCount >= WIN_PERCENT || snap.rivals === 0) endRound(true);
+    else if (snap.maxRival / landCount >= WIN_PERCENT) endRound(false);
   }
 
   // Render: changed cells → offscreen, then one scaled blit.
@@ -164,10 +196,10 @@ startGameLoop((dt) => {
   hudT += dt;
   if (hudT >= 0.2) {
     hudT = 0;
+    const snap = snapshot();
     balEl.textContent = Math.floor(grid.balance[OWNER_PLAYER]).toString();
-    const owned = grid.ownedCount[OWNER_PLAYER];
-    pctEl.textContent = `${((owned / landCount) * 100).toFixed(1)}%`;
-    rivalsEl.textContent = rivalsAlive().toString();
+    pctEl.textContent = `${((snap.player / landCount) * 100).toFixed(1)}%`;
+    rivalsEl.textContent = snap.rivals.toString();
     fpsEl.textContent = Math.round(fps).toString();
   }
 });

@@ -22,9 +22,7 @@ export const MAX_OWNERS = 256; // Uint8 id space; per-owner arrays sized to this
 // --- Map -----------------------------------------------------------------
 export const WATER_BORDER = true; // impassable frame for a visible boundary
 export const WATER_BORDER_THICKNESS = 3; // cells
-export const START_ZONE_RADIUS = 4; // half-size of the player's spawn square
-export const SPAWN_X = Math.floor(GRID_W / 2);
-export const SPAWN_Y = Math.floor(GRID_H / 2);
+export const START_ZONE_RADIUS = 4; // half-size of every spawn square (player + bots)
 
 // --- Simulation ----------------------------------------------------------
 export const SIM_HZ = 30; // fixed-step frequency (decoupled from render)
@@ -54,20 +52,27 @@ export const STRENGTH_SIZE_FACTOR = 0.5; // per owned cell
 export const ATTACK_COST_BASE = 3;
 export const DEFENSE_FACTOR = 1.5;
 
-// --- Enemies (Phase 2: passive defenders, fixed spawns) ------------------
-// Phase 3 replaces these fixed spawns with distributed spawns + difficulty.
-export interface SpawnPoint {
-  x: number;
-  y: number;
-}
-export const ENEMY_SPAWNS: readonly SpawnPoint[] = [
-  { x: 40, y: 56 },
-  { x: 104, y: 56 },
-  { x: 72, y: 224 },
-];
-export const ENEMY_START_RADIUS = 6; // bigger than the player's start (a threat)
-// Phase 2 enemies never grab neutral — they only bank, defend, and counter.
-export const ENEMY_DEFENSIVE = true;
+// --- Bots & difficulty (Phase 3) -----------------------------------------
+// Bots are first-class players (same rules), driven by a simple state AI.
+export const BOT_COUNT = 5;
+export const BOT_AGGRESSION = 0.5; // 0..1 — higher attacks sooner / nearer-equal
+export const ECO_SPEED = 1; // global income multiplier (game pace)
+export const DECISION_INTERVAL = 0.6; // seconds between a bot's AI decisions
+// A bot attacks a rival when its strength > rival strength * margin. Aggression
+// lerps the margin from BASE (cautious) down to MIN (reckless).
+export const ATTACK_MARGIN_BASE = 1.6;
+export const ATTACK_MARGIN_MIN = 1.05;
+// Under attack and the strongest attacker is ≥ DEFEND_RATIO × my strength → DEFEND.
+export const DEFEND_RATIO = 1.0;
+// Cells lost since the last decision to count as "under attack".
+export const ATTACK_DETECT_CELLS = 3;
+
+// --- Spawns (Phase 3: distributed) ---------------------------------------
+export const SPAWN_MIN_DIST = 56; // min cell distance between spawn centres
+export const SPAWN_PLACE_TRIES = 4000; // rejection-sampling attempts
+
+// --- Win condition -------------------------------------------------------
+export const WIN_PERCENT = 0.6; // control this share of LAND to win the round
 
 // --- Colors (0xRRGGBB; packed to RGBA in render.ts) ----------------------
 // Reuse the repo AURORA night palette: warm ember is reserved for the player,
