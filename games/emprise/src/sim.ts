@@ -25,14 +25,16 @@ import {
   ATTACK_COST_BASE,
   DEFENSE_FACTOR,
   ECO_SPEED,
+  BOT_ECO_HANDICAP,
   DECISION_INTERVAL,
 } from './config';
 import type { Grid } from './grid';
 
 // Behavior modes (per owner).
-export const MODE_IDLE = 0; // bank Balance, don't push (player untouched / bot DEFEND)
+export const MODE_IDLE = 0; // bank Balance, don't push (bot DEFEND / surrounded)
 export const MODE_DIRECTED = 1; // advance the front toward target[o] (steer / ATTACK)
-export const MODE_GREEDY = 2; // grab every affordable fringe cell, no direction (EXPAND)
+export const MODE_GREEDY = 2; // grab every affordable fringe cell (neutral + enemy) — bot EXPAND
+export const MODE_GREEDY_NEUTRAL = 3; // grab neutral only, omnidirectional — the player's default
 
 export interface Sim {
   grid: Grid;
@@ -119,6 +121,9 @@ export function setTarget(sim: Sim, o: number, cx: number, cy: number): void {
 export function setGreedy(sim: Sim, o: number): void {
   sim.mode[o] = MODE_GREEDY;
 }
+export function setGreedyNeutral(sim: Sim, o: number): void {
+  sim.mode[o] = MODE_GREEDY_NEUTRAL;
+}
 export function setIdle(sim: Sim, o: number): void {
   sim.mode[o] = MODE_IDLE;
 }
@@ -148,7 +153,8 @@ export function simTick(sim: Sim, dt: number): void {
     const o = active[a];
     const owned = grid.ownedCount[o];
     if (owned === 0) continue;
-    const income = (BASE_INCOME_PER_SEC + BALANCE_PER_CELL_PER_SEC * owned) * ECO_SPEED;
+    let income = (BASE_INCOME_PER_SEC + BALANCE_PER_CELL_PER_SEC * owned) * ECO_SPEED;
+    if (o !== OWNER_PLAYER) income *= BOT_ECO_HANDICAP; // bots out-thought, not out-economied
     const cap = BALANCE_CAP_BASE + BALANCE_CAP_PER_CELL * owned;
     let bal = grid.balance[o] + income * dt;
     if (bal > cap) bal = cap;
@@ -210,7 +216,9 @@ function processOwner(sim: Sim, o: number): void {
   const fringe = sim.fringe;
   const fringeMark = sim.fringeMark;
 
-  // 1. Gather this owner's conquerable targets (neutral + enemy, deduped).
+  // 1. Gather this owner's conquerable targets (deduped). GREEDY_NEUTRAL skips
+  //    enemy cells so the player auto-grows into neutral without auto-attacking.
+  const includeEnemy = m !== MODE_GREEDY_NEUTRAL;
   let fl = 0;
   const len = sim.borderLen;
   for (let i = 0; i < len; i++) {
@@ -218,10 +226,10 @@ function processOwner(sim: Sim, o: number): void {
     if (!isBorder[c] || owner[c] !== o) continue;
     const x = c % GRID_W;
     const y = (c / GRID_W) | 0;
-    if (x > 0) fl = addTarget(sim, fringe, fl, c - 1, o);
-    if (x < GRID_W - 1) fl = addTarget(sim, fringe, fl, c + 1, o);
-    if (y > 0) fl = addTarget(sim, fringe, fl, c - GRID_W, o);
-    if (y < GRID_H - 1) fl = addTarget(sim, fringe, fl, c + GRID_W, o);
+    if (x > 0) fl = addTarget(sim, fringe, fl, c - 1, o, includeEnemy);
+    if (x < GRID_W - 1) fl = addTarget(sim, fringe, fl, c + 1, o, includeEnemy);
+    if (y > 0) fl = addTarget(sim, fringe, fl, c - GRID_W, o, includeEnemy);
+    if (y < GRID_H - 1) fl = addTarget(sim, fringe, fl, c + GRID_W, o, includeEnemy);
   }
 
   if (fl === 0) return;
@@ -249,10 +257,19 @@ function processOwner(sim: Sim, o: number): void {
   for (let k = 0; k < fl; k++) fringeMark[fringe[k]] = 0;
 }
 
-/** Add `t` to `o`'s target list if conquerable by `o` (neutral or enemy). */
-function addTarget(sim: Sim, fringe: Int32Array, fl: number, t: number, o: number): number {
+/** Add `t` to `o`'s target list if conquerable by `o`. With `includeEnemy`
+ *  false, only neutral land is taken (the player's auto-expand). */
+function addTarget(
+  sim: Sim,
+  fringe: Int32Array,
+  fl: number,
+  t: number,
+  o: number,
+  includeEnemy: boolean,
+): number {
   const od = sim.grid.owner[t];
   if (od === o || od === OWNER_WATER) return fl;
+  if (od !== OWNER_NEUTRAL && !includeEnemy) return fl;
   if (sim.fringeMark[t]) return fl;
   sim.fringeMark[t] = 1;
   fringe[fl] = t;

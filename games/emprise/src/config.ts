@@ -49,15 +49,19 @@ export const MAX_CONVERSIONS_PER_TICK = 120;
 export const STRENGTH_SIZE_FACTOR = 0.5; // per owned cell
 // Cost to conquer an ENEMY cell = base * (1 + DEFENSE_FACTOR * defStr/atkStr).
 // Attacking someone stronger gets expensive fast → you stall and drain.
-export const ATTACK_COST_BASE = 3;
-export const DEFENSE_FACTOR = 1.5;
+// Tuned down from 3 / 1.5 so fronts move and turtling bots stay crackable.
+export const ATTACK_COST_BASE = 2.5;
+export const DEFENSE_FACTOR = 0.9;
 
 // --- Bots & difficulty (Phase 3) -----------------------------------------
 // Bots are first-class players (same rules), driven by a simple state AI.
-export const BOT_COUNT = 5;
-export const BOT_AGGRESSION = 0.5; // 0..1 — higher attacks sooner / nearer-equal
+export const BOT_COUNT = 4;
+export const BOT_AGGRESSION = 0.45; // 0..1 — higher attacks sooner / nearer-equal
 export const ECO_SPEED = 1; // global income multiplier (game pace)
-export const DECISION_INTERVAL = 0.6; // seconds between a bot's AI decisions
+export const DECISION_INTERVAL = 0.7; // seconds between a bot's AI decisions
+// Bots earn a fraction of the player's income so a competent human can out-grow
+// them — the player out-thinks; the AI doesn't out-economy.
+export const BOT_ECO_HANDICAP = 0.9;
 // A bot attacks a rival when its strength > rival strength * margin. Aggression
 // lerps the margin from BASE (cautious) down to MIN (reckless).
 export const ATTACK_MARGIN_BASE = 1.6;

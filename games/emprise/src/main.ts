@@ -3,7 +3,14 @@
 import { startGameLoop } from '@games-lab/shared';
 import { SIM_STEP, OWNER_PLAYER, WIN_PERCENT } from './config';
 import { createGrid, type Grid } from './grid';
-import { createSim, setTarget, clearTarget, simTick, clearDirty, type Sim } from './sim';
+import {
+  createSim,
+  setTarget,
+  setGreedyNeutral,
+  simTick,
+  clearDirty,
+  type Sim,
+} from './sim';
 import { aiStep } from './ai';
 import {
   createRenderer,
@@ -29,6 +36,7 @@ let landCount = grid.landCount;
 let totalPlayers = sim.activeOwners.length;
 let running = true;
 let elapsed = 0;
+setGreedyNeutral(sim, OWNER_PLAYER); // auto-expand into neutral by default
 
 // --- canvas sizing (DPR capped at 2) -------------------------------------
 let cssW = 0;
@@ -50,12 +58,19 @@ resize();
 
 paintFull(renderer, grid);
 
-// --- input: tap/drag steers the player's expansion target ----------------
+// --- input: HOLD/drag to focus a directed push (attack), RELEASE to auto-grow.
+// The player always auto-expands into neutral; holding aims a concentrated
+// push (and attacks whatever you aim at) so you have parity with the bots'
+// omnidirectional growth while keeping a touch-friendly single-finger control.
 let pointerDown = false;
 function steer(e: PointerEvent): void {
   if (!running) return;
   const cell = pointerToCell(renderer, e.clientX, e.clientY);
   if (cell) setTarget(sim, OWNER_PLAYER, cell.x, cell.y);
+}
+function release(): void {
+  pointerDown = false;
+  setGreedyNeutral(sim, OWNER_PLAYER); // back to omnidirectional auto-expand
 }
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
@@ -70,10 +85,10 @@ canvas.addEventListener('pointermove', (e) => {
 });
 canvas.addEventListener('pointerup', (e) => {
   e.preventDefault();
-  pointerDown = false;
+  release();
 });
 canvas.addEventListener('pointercancel', () => {
-  pointerDown = false;
+  release();
 });
 // Belt-and-suspenders against iOS scroll/zoom gestures.
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
@@ -142,7 +157,7 @@ function newGame(): void {
   sim = createSim(grid);
   landCount = grid.landCount;
   totalPlayers = sim.activeOwners.length;
-  clearTarget(sim, OWNER_PLAYER);
+  setGreedyNeutral(sim, OWNER_PLAYER);
   running = true;
   elapsed = 0;
   acc = 0;
