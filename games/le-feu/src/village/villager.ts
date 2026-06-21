@@ -4,9 +4,18 @@
 // rule le-feu keeps its own trimmed factory and we promote later if a 2nd game
 // wants it. Procedural walk: hip-pivoted legs swing, the body bobs.
 import * as THREE from 'three';
-import { PALETTE, VILLAGER, LIGHTS } from './../config';
+import { PALETTE, VILLAGER, LIGHTS, RESOURCE_COLORS, type TraitId, type ResourceKind } from './../config';
+import type { BuildingInstance } from './../buildings';
 
-export type VillagerState = 'wander' | 'pause' | 'toFire' | 'idleFire';
+export type VillagerState =
+  | 'wander' // unassigned: roaming the island by day
+  | 'pause' // unassigned: idling between hops
+  | 'toFire' // night: walking to the fire ring
+  | 'idleFire' // night: huddled at the fire
+  | 'toWork' // assigned: walking to the work node
+  | 'working' // assigned: gathering (timer)
+  | 'toStorage' // assigned: hauling a load to a dropoff
+  | 'deposit'; // assigned: dropping the load
 
 export interface Villager {
   x: number;
@@ -14,22 +23,35 @@ export interface Villager {
   tx: number; // target world x
   tz: number; // target world z
   state: VillagerState;
-  pauseT: number; // seconds left to idle before next wander hop
+  pauseT: number; // seconds left to idle (pause / working / deposit timers reuse this)
   facing: number; // yaw (radians)
   moving: boolean;
   bobPhase: number; // per-villager phase offset so the crowd desyncs
+  // Phase 2 economy:
+  job: BuildingInstance | null; // assigned production building, or null = idle
+  trait: TraitId | null; // rendement modifier (data-driven)
+  carryKind: ResourceKind | null; // what it's hauling (null = empty)
+  carryAmt: number;
+  recruiting: boolean; // a wanderer walking in to join — not yet a colonist
   root: THREE.Group; // positioned + yawed by the sim
   body: THREE.Group; // inner group that bobs vertically
   legL: THREE.Group; // hip pivots
   legR: THREE.Group;
   torchLight: THREE.PointLight;
+  carryMesh: THREE.Mesh; // little block shown over the shoulder while hauling
 }
 
 function lambert(color: number): THREE.MeshLambertMaterial {
   return new THREE.MeshLambertMaterial({ color, flatShading: true });
 }
 
-export function createVillager(x: number, z: number, tuque: number, bobPhase: number): Villager {
+export function createVillager(
+  x: number,
+  z: number,
+  tuque: number,
+  bobPhase: number,
+  trait: TraitId | null,
+): Villager {
   const root = new THREE.Group();
   root.position.set(x, 0, z);
 
@@ -98,6 +120,12 @@ export function createVillager(x: number, z: number, tuque: number, bobPhase: nu
   torch.add(torchLight);
   body.add(torch);
 
+  // Carried load: a small block over the shoulder, hidden until hauling.
+  const carryMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), lambert(PALETTE.wood));
+  carryMesh.position.set(-0.18, 1.02, -0.12);
+  carryMesh.visible = false;
+  body.add(carryMesh);
+
   root.scale.setScalar(VILLAGER.scale);
 
   return {
@@ -110,11 +138,17 @@ export function createVillager(x: number, z: number, tuque: number, bobPhase: nu
     facing: 0,
     moving: false,
     bobPhase,
+    job: null,
+    trait,
+    carryKind: null,
+    carryAmt: 0,
+    recruiting: false,
     root,
     body,
     legL,
     legR,
     torchLight,
+    carryMesh,
   };
 }
 
@@ -148,4 +182,11 @@ export function updateVillagerVisual(v: Villager, t: number, dt: number, night: 
 
   const target = night ? LIGHTS.torch.intensity : 0;
   v.torchLight.intensity = lerp(v.torchLight.intensity, target, Math.min(1, dt * 4));
+
+  // Carried load block: shown while hauling, coloured by what's carried.
+  const hauling = v.carryAmt > 0 && v.carryKind !== null;
+  v.carryMesh.visible = hauling;
+  if (hauling && v.carryKind) {
+    (v.carryMesh.material as THREE.MeshLambertMaterial).color.setHex(RESOURCE_COLORS[v.carryKind]);
+  }
 }

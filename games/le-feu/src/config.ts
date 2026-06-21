@@ -22,6 +22,16 @@ export const PALETTE = {
   aurora: AURORA.auroraGreen, // 0x2ec4b6 supernatural accent (later phases)
   violet: AURORA.violet, // 0x9d4edd second supernatural accent
   skin: 0xd9a679, // villager faces/hands
+  stone: 0x8a93a6, // quarry / stone resource
+  foliage: 0x2f5a3a, // tree canopy (lumberjack work node)
+  meat: 0xc0533f, // food / game resource
+} as const;
+
+// Resource → carried-block / icon colour.
+export const RESOURCE_COLORS = {
+  wood: PALETTE.wood,
+  food: PALETTE.meat,
+  stone: PALETTE.stone,
 } as const;
 
 // Tuque color variants so the crowd reads as distinct people.
@@ -134,13 +144,137 @@ export const VILLAGER = {
   scale: 1.0,
 } as const;
 
-// --- Buildings (Phase 1: only the test hut; fire is special, see fire.ts) ---
+// --- Resources & economy (Phase 2) -----------------------------------------
+export type ResourceKind = 'wood' | 'food' | 'stone';
+export const RESOURCE_KINDS: readonly ResourceKind[] = ['wood', 'food', 'stone'] as const;
+
+export const RESOURCE_ICON: Record<ResourceKind, string> = {
+  wood: '🪵',
+  food: '🍖',
+  stone: '🪨',
+};
+
+export const ECONOMY = {
+  start: { wood: 45, food: 35, stone: 12 } as Record<ResourceKind, number>,
+  // The fire is base storage so the loop works before any entrepôt is built.
+  fireBaseCap: { wood: 60, food: 60, stone: 40 } as Record<ResourceKind, number>,
+  foodPerVillagerPerSec: 0.11, // population eats this each sim-second
+  starveGrace: 9, // seconds at zero food before one villager dies
+} as const;
+
+// Work cycle timing (shared by all production buildings).
+export const WORK = {
+  gatherTime: 2.4, // seconds standing at the work spot per load
+  depositTime: 0.35, // seconds dropping a load at storage
+  estCycleSec: 6.5, // rough full-loop time, only for the HUD "+/min" estimate
+} as const;
+
+// --- Villager traits (data-driven rendement modifiers) ---------------------
+export type TraitId = 'travaillant' | 'costaud' | 'robuste';
+export interface Trait {
+  name: string;
+  yieldMult?: number; // multiplies what a work-load gathers
+  carryMult?: number; // multiplies load size (fewer trips)
+}
+export const TRAITS: Record<TraitId, Trait> = {
+  travaillant: { name: 'Travaillant', yieldMult: 1.35 },
+  costaud: { name: 'Costaud', carryMult: 1.5 },
+  robuste: { name: 'Robuste' }, // hook for reduced hunger / combat later
+};
+// Each new villager rolls one of these (or none).
+export const TRAIT_POOL: readonly (TraitId | null)[] = ['travaillant', 'costaud', 'robuste', null, null] as const;
+
+// --- Recruitment -----------------------------------------------------------
+export const RECRUIT = {
+  interval: 20, // sim seconds between arrival attempts
+  basePopCap: 8, // population cap before any house is built
+  perHouse: 3, // each maison raises the cap by this
+} as const;
+
+// --- Buildings -------------------------------------------------------------
+// Souple unlock: every buildable is available from the start, gated ONLY by
+// affordability — no prereq chains (the deliberate fix vs the original).
+export type BuildingKind = 'production' | 'storage' | 'house' | 'fire';
+export type Cost = Partial<Record<ResourceKind, number>>;
+export type WorkDecor = 'tree' | 'game' | 'rock';
+
 export interface BuildingDef {
   id: string;
   name: string;
-  footprint: number; // cells (1 = single cell)
-  color: number;
+  kind: BuildingKind;
+  color: number; // wall colour
+  cost: Cost;
+  buildable: boolean; // appears in the build picker
+  icon: string; // picker label
+  produces?: { resource: ResourceKind; perTrip: number };
+  maxWorkers?: number;
+  storageCap?: Cost; // storage buildings add this to global capacity
+  houseCapacity?: number; // houses raise the population cap
+  workSpotOffset?: number; // cells from the hut to its work node
+  workDecor?: WorkDecor; // decor placed at the work node
 }
+
 export const BUILDINGS: Record<string, BuildingDef> = {
-  hut: { id: 'hut', name: 'Hutte', footprint: 1, color: PALETTE.wood },
+  bucheron: {
+    id: 'bucheron',
+    name: 'Bûcheron',
+    kind: 'production',
+    color: PALETTE.wood,
+    cost: { wood: 15 },
+    buildable: true,
+    icon: '🪓',
+    produces: { resource: 'wood', perTrip: 4 },
+    maxWorkers: 3,
+    workSpotOffset: 1.5,
+    workDecor: 'tree',
+  },
+  chasse: {
+    id: 'chasse',
+    name: 'Cabane de chasse',
+    kind: 'production',
+    color: PALETTE.woodDark,
+    cost: { wood: 20 },
+    buildable: true,
+    icon: '🏹',
+    produces: { resource: 'food', perTrip: 3 },
+    maxWorkers: 3,
+    workSpotOffset: 1.6,
+    workDecor: 'game',
+  },
+  carriere: {
+    id: 'carriere',
+    name: 'Carrière',
+    kind: 'production',
+    color: PALETTE.stone,
+    cost: { wood: 25 },
+    buildable: true,
+    icon: '⛏️',
+    produces: { resource: 'stone', perTrip: 3 },
+    maxWorkers: 2,
+    workSpotOffset: 1.5,
+    workDecor: 'rock',
+  },
+  entrepot: {
+    id: 'entrepot',
+    name: 'Entrepôt',
+    kind: 'storage',
+    color: PALETTE.snow,
+    cost: { wood: 20, stone: 10 },
+    buildable: true,
+    icon: '📦',
+    storageCap: { wood: 80, food: 80, stone: 60 },
+  },
+  maison: {
+    id: 'maison',
+    name: 'Maison',
+    kind: 'house',
+    color: PALETTE.wood,
+    cost: { wood: 25 },
+    buildable: true,
+    icon: '🏠',
+    houseCapacity: 3,
+  },
 };
+
+// Order shown in the build picker.
+export const BUILD_ORDER: readonly string[] = ['bucheron', 'chasse', 'carriere', 'entrepot', 'maison'];

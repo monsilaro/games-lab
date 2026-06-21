@@ -52,21 +52,125 @@
         pointer-events: none;
       }
       #le-feu-day {
-        font-size: 22px;
+        font-size: 20px;
         font-weight: 800;
         color: #e8edf2;
         text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
       }
       #le-feu-phase {
         align-self: flex-start;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
         padding: 3px 10px;
         border-radius: 999px;
         color: #0a1128;
         background: #ff9f1c;
       }
-      /* Bottom: speed cluster + build toggle. */
+      /* Top-right: resource + population bar. */
+      #le-feu-resources {
+        position: fixed;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        right: calc(env(safe-area-inset-right, 0px) + 12px);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px 10px;
+        max-width: 62vw;
+        pointer-events: none;
+      }
+      .le-feu-res {
+        font-size: 14px;
+        font-weight: 700;
+        color: #e8edf2;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+        white-space: nowrap;
+      }
+      .le-feu-res.le-feu-full {
+        color: #ffd166;
+      }
+      .le-feu-res.le-feu-low {
+        color: #ff6b5e;
+      }
+      #le-feu-famine {
+        position: fixed;
+        z-index: 11;
+        top: calc(env(safe-area-inset-top, 0px) + 52px);
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 14px;
+        font-weight: 800;
+        color: #0a1128;
+        background: #ff6b5e;
+        padding: 5px 14px;
+        border-radius: 999px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        display: none;
+        pointer-events: none;
+      }
+      /* World-anchored markers (recruit "!", idle building "💤"). */
+      #le-feu-markers {
+        position: fixed;
+        inset: 0;
+        z-index: 9;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .le-feu-marker {
+        position: absolute;
+        font-size: 20px;
+        transform: translate(-50%, -110%);
+        filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7));
+      }
+      /* Build picker row (shown only in build mode). */
+      #le-feu-picker {
+        position: fixed;
+        z-index: 10;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+        display: none;
+        gap: 6px;
+        max-width: 96vw;
+        overflow-x: auto;
+        padding: 4px;
+      }
+      .le-feu-pick {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: inherit;
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        min-width: 70px;
+        padding: 8px 8px;
+        border-radius: 12px;
+        color: #e8edf2;
+        background: rgba(28, 37, 65, 0.92);
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+      }
+      .le-feu-pick.le-feu-on {
+        outline: 2px solid #ff9f1c;
+      }
+      .le-feu-pick[disabled] {
+        opacity: 0.4;
+      }
+      .le-feu-pick .le-feu-pick-ico {
+        font-size: 20px;
+      }
+      .le-feu-pick .le-feu-pick-name {
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .le-feu-pick .le-feu-pick-cost {
+        font-size: 10px;
+        font-weight: 600;
+        color: #aebbd6;
+      }
+      /* Bottom controls. */
       #le-feu-controls {
         position: fixed;
         z-index: 10;
@@ -102,37 +206,106 @@
         color: #0a1128;
         background: #ff9f1c;
       }
-      #le-feu-build-hint {
+      /* Assignment sheet (bottom). */
+      #le-feu-sheet {
         position: fixed;
-        z-index: 10;
-        left: 0;
-        right: 0;
+        z-index: 12;
+        left: 50%;
+        transform: translateX(-50%);
         bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
-        text-align: center;
-        font-size: 14px;
-        font-weight: 700;
+        width: min(92vw, 360px);
+        background: rgba(16, 24, 48, 0.96);
+        border: 1px solid #2a3656;
+        border-radius: 16px;
+        padding: 14px 16px;
         color: #e8edf2;
-        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
-        pointer-events: none;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
         display: none;
+      }
+      #le-feu-sheet-title {
+        font-size: 17px;
+        font-weight: 800;
+        margin-bottom: 2px;
+      }
+      #le-feu-sheet-rate {
+        font-size: 13px;
+        color: #aebbd6;
+        margin-bottom: 12px;
+      }
+      #le-feu-sheet-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      #le-feu-sheet-workers {
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .le-feu-step {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 22px;
+        font-weight: 800;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        color: #0a1128;
+        background: #2ec4b6;
+      }
+      .le-feu-step[disabled] {
+        opacity: 0.4;
+      }
+      #le-feu-sheet-idle {
+        font-size: 12px;
+        color: #aebbd6;
+        margin-top: 10px;
+      }
+      #le-feu-sheet-close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: #aebbd6;
+        font-size: 20px;
+        font-weight: 800;
+        cursor: pointer;
       }
       #le-feu-build-stamp {
         position: fixed;
         z-index: 10;
         right: calc(env(safe-area-inset-right, 0px) + 8px);
-        top: calc(env(safe-area-inset-top, 0px) + 8px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
         font-size: 10px;
-        color: rgba(232, 237, 242, 0.45);
+        color: rgba(232, 237, 242, 0.4);
         pointer-events: none;
       }
     </style>
   </head>
   <body>
+    <div id="le-feu-markers"></div>
     <div id="le-feu-clock">
       <div id="le-feu-day">Jour 1</div>
       <div id="le-feu-phase">Jour</div>
     </div>
-    <div id="le-feu-build-hint">Touche une case libre pour bâtir · retouche 🔨 pour annuler</div>
+    <div id="le-feu-resources"></div>
+    <div id="le-feu-famine">⚠️ Famine</div>
+    <div id="le-feu-picker"></div>
+    <div id="le-feu-sheet">
+      <button id="le-feu-sheet-close" type="button">✕</button>
+      <div id="le-feu-sheet-title">—</div>
+      <div id="le-feu-sheet-rate">—</div>
+      <div id="le-feu-sheet-row">
+        <button class="le-feu-step" id="le-feu-sheet-minus" type="button">−</button>
+        <div id="le-feu-sheet-workers">0 / 0</div>
+        <button class="le-feu-step" id="le-feu-sheet-plus" type="button">+</button>
+      </div>
+      <div id="le-feu-sheet-idle">Disponibles : 0</div>
+    </div>
     <div id="le-feu-controls">
       <button class="le-feu-btn" id="le-feu-pause" type="button">⏸</button>
       <button class="le-feu-btn le-feu-on" id="le-feu-x1" type="button">×1</button>
