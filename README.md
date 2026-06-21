@@ -27,6 +27,7 @@ From prompt to playable build on device in about a minute.
 |Snake|Neon Snake — swipe to steer, eat code spheres, dodge the walls & your own tail|[▶️](https://monsilaro.github.io/games-lab/snake/)|
 |SynthRider 3D|Retro-synthwave lane-dodge runner — ride the neon grid at warp speed|[▶️](https://monsilaro.github.io/games-lab/synth-rider/)|
 |Space Invaders|Classic arcade shooter — drag to move, tap to fire, defeat waves of aliens|[▶️](https://monsilaro.github.io/games-lab/space-invaders/)|
+|Emprise|Pixel territorial conquest (territorial.io-like) — touch & drag to flood-fill an empire over a 40k-cell grid|[▶️](https://monsilaro.github.io/games-lab/emprise/)|
 
 *(New prototypes appear on the arcade index automatically.)*
 

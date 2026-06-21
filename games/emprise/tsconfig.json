@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // Emprise is built on dense typed arrays (Uint8Array owner grid, Int32Array
+    // fronts) indexed by provably in-bounds integers inside hot per-tick loops.
+    // noUncheckedIndexedAccess would force a non-null `!` on every element read
+    // with zero added safety, littering the perf code — so it is disabled for
+    // THIS game only. Every other strict check stays on.
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src", "vite.config.ts"]
+}

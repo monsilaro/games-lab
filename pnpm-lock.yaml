@@ -30,6 +30,22 @@ importers:
         specifier: ^6.3.5
         version: 6.4.3(@types/node@25.9.2)
 
+  games/emprise:
+    dependencies:
+      '@games-lab/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.2
+        version: 25.9.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vite:
+        specifier: ^6.3.5
+        version: 6.4.3(@types/node@25.9.2)
+
   games/flappy:
     dependencies:
       '@games-lab/shared':

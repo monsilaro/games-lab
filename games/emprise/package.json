@@ -1,0 +1,20 @@
+{
+  "name": "emprise",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@games-lab/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
