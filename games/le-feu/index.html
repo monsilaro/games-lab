@@ -95,7 +95,7 @@
       #le-feu-famine {
         position: fixed;
         z-index: 11;
-        top: calc(env(safe-area-inset-top, 0px) + 52px);
+        top: calc(env(safe-area-inset-top, 0px) + 120px);
         left: 50%;
         transform: translateX(-50%);
         font-size: 14px;
@@ -284,6 +284,130 @@
         color: rgba(232, 237, 242, 0.4);
         pointer-events: none;
       }
+      /* Quest panel: top-center, under the day pill, above the resource bar. */
+      #le-feu-quest {
+        position: fixed;
+        z-index: 11;
+        left: 50%;
+        transform: translateX(-50%);
+        top: calc(env(safe-area-inset-top, 0px) + 52px);
+        width: min(86vw, 340px);
+        background: rgba(16, 24, 48, 0.82);
+        border: 1px solid #2a3656;
+        border-left: 3px solid #ff9f1c;
+        border-radius: 12px;
+        padding: 8px 12px;
+        pointer-events: none;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      }
+      #le-feu-quest-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+      }
+      #le-feu-quest-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #ffd166;
+      }
+      #le-feu-quest-step {
+        font-size: 11px;
+        font-weight: 700;
+        color: #aebbd6;
+        white-space: nowrap;
+      }
+      #le-feu-quest-desc {
+        font-size: 12px;
+        font-weight: 600;
+        color: #e8edf2;
+        margin-top: 2px;
+        line-height: 1.3;
+      }
+      /* Completion toast. */
+      #le-feu-quest-toast {
+        position: fixed;
+        z-index: 20;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) scale(0.9);
+        background: linear-gradient(135deg, #ff9f1c, #9d4edd);
+        color: #0a1128;
+        font-size: 16px;
+        font-weight: 800;
+        padding: 12px 22px;
+        border-radius: 999px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+      #le-feu-quest-toast.le-feu-toast-show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+      /* Intro / onboarding overlay. */
+      #le-feu-intro {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(10, 17, 40, 0.82);
+        -webkit-backdrop-filter: blur(3px);
+        backdrop-filter: blur(3px);
+      }
+      #le-feu-intro-card {
+        width: min(90vw, 380px);
+        background: rgba(16, 24, 48, 0.97);
+        border: 1px solid #2a3656;
+        border-radius: 20px;
+        padding: 24px 22px;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+      }
+      #le-feu-intro-title {
+        font-size: 30px;
+        font-weight: 800;
+        color: #ff9f1c;
+        margin-bottom: 4px;
+      }
+      #le-feu-intro-sub {
+        font-size: 13px;
+        font-weight: 700;
+        color: #2ec4b6;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 14px;
+      }
+      #le-feu-intro-body {
+        font-size: 14px;
+        font-weight: 500;
+        color: #e8edf2;
+        line-height: 1.5;
+        margin-bottom: 16px;
+      }
+      #le-feu-intro-obj {
+        font-size: 13px;
+        font-weight: 700;
+        color: #ffd166;
+        margin-bottom: 20px;
+      }
+      #le-feu-intro-start {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 17px;
+        font-weight: 800;
+        color: #0a1128;
+        background: #ff9f1c;
+        padding: 12px 28px;
+        border-radius: 14px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+      }
     </style>
   </head>
   <body>
@@ -293,6 +417,14 @@
       <div id="le-feu-phase">Jour</div>
     </div>
     <div id="le-feu-resources"></div>
+    <div id="le-feu-quest">
+      <div id="le-feu-quest-head">
+        <div id="le-feu-quest-title">—</div>
+        <div id="le-feu-quest-step"></div>
+      </div>
+      <div id="le-feu-quest-desc">—</div>
+    </div>
+    <div id="le-feu-quest-toast"></div>
     <div id="le-feu-famine">⚠️ Famine</div>
     <div id="le-feu-picker"></div>
     <div id="le-feu-sheet">
@@ -314,6 +446,19 @@
       <button class="le-feu-btn" id="le-feu-build" type="button">🔨</button>
     </div>
     <div id="le-feu-build-stamp"></div>
+    <div id="le-feu-intro">
+      <div id="le-feu-intro-card">
+        <div id="le-feu-intro-title">Le Feu</div>
+        <div id="le-feu-intro-sub">Nuit de veillée</div>
+        <div id="le-feu-intro-body">
+          Au cœur de l'hiver, un feu et une poignée de villageois. Garde le feu
+          vivant, récolte bois, nourriture et pierre, et fais grandir le camp
+          avant que la nuit ne l'emporte.
+        </div>
+        <div id="le-feu-intro-obj">—</div>
+        <button id="le-feu-intro-start" type="button">Commencer</button>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

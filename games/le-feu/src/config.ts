@@ -14,13 +14,14 @@ export const PALETTE = {
   fire: AURORA.ember, // 0xff9f1c the central fire
   fireHot: AURORA.emberLight, // 0xffd166 inner flame / torch tip
   snow: AURORA.snow, // 0xe8edf2 snow ground band
+  snowDim: 0xb7c4d6, // shaded snow (drifts / island rim band)
   wood: 0x8b5a2b, // logs, hut walls
   woodDark: 0x5e3d1d, // hut frame / shadow tone
-  ground: 0x24304f, // island top (cold lit lambert)
-  groundEdge: 0x161f38, // island cliff sides
-  water: 0x0c1733, // surrounding sea
-  aurora: AURORA.auroraGreen, // 0x2ec4b6 supernatural accent (later phases)
-  violet: AURORA.violet, // 0x9d4edd second supernatural accent
+  ground: 0x2b3a5e, // island top (cold lit lambert) — lifted for contrast vs sky/sea
+  groundEdge: 0x10182e, // island cliff sides — darker for depth
+  water: 0x081024, // surrounding sea — darker so the island reads
+  aurora: AURORA.auroraGreen, // 0x2ec4b6 supernatural accent (night aurora)
+  violet: AURORA.violet, // 0x9d4edd second supernatural accent (night aurora)
   skin: 0xd9a679, // villager faces/hands
   stone: 0x8a93a6, // quarry / stone resource
   foliage: 0x2f5a3a, // tree canopy (lumberjack work node)
@@ -77,7 +78,7 @@ export const LIGHTS = {
 
 // Sky clear-color endpoints (lerped by the clock).
 export const SKY = {
-  day: 0x24304f, // cold lit blue-grey
+  day: 0x33507a, // cold lit blue-grey — lighter than the ground so a horizon reads
   night: PALETTE.night, // deep night
 } as const;
 
@@ -278,3 +279,54 @@ export const BUILDINGS: Record<string, BuildingDef> = {
 
 // Order shown in the build picker.
 export const BUILD_ORDER: readonly string[] = ['bucheron', 'chasse', 'carriere', 'entrepot', 'maison'];
+
+// --- Visual: scattered island decor (Phase 3) ------------------------------
+// Static low-poly props dressed near the cliff band so the island isn't an empty
+// disc. Placed once at boot; their cells are marked occupied so build/AI agree.
+export const DECOR = {
+  count: 16, // total props scattered on the rim band
+  ringMin: 5.2, // cells from centre: keep the inner camp clear
+  ringMax: 7.6, // ...out to just inside the cliff edge (islandRadius 8)
+  // Relative weights for the three prop kinds.
+  weights: { tree: 5, drift: 3, rock: 3 } as Record<'tree' | 'drift' | 'rock', number>,
+} as const;
+
+// --- Visual: fire FX (Phase 3) ---------------------------------------------
+// The hearth showpiece: a warm ground-glow disc + a single rising-ember Points
+// system (one fixed pool, one attribute upload per frame — cheap on mobile).
+export const FIRE_FX = {
+  glowRadius: 2.4, // ground glow disc radius (world units)
+  glowIntensity: 0.5, // base emissive of the glow disc (pulsed by the flicker)
+  emberCount: 40, // particle pool size
+  emberRise: 1.7, // base upward speed (units/sec)
+  emberDrift: 0.5, // horizontal curl amplitude (units/sec)
+  emberLifeMin: 0.9, // seconds an ember lives before respawn
+  emberLifeMax: 1.8,
+  emberSize: 0.16, // PointsMaterial size (world units)
+  emberSpawnR: 0.35, // spawn radius around the ember bed
+} as const;
+
+// --- Visual: night aurora curtain (Phase 3) --------------------------------
+// A wide arced ribbon high behind the island, vertex-gradient aurora→violet.
+// Emissive Lambert (NOT MeshBasic) so it stays within the lit convention; its
+// opacity is ramped by (1 - daylight) in applyLighting so it only shows at night.
+// Placement is tuned to the tilted-ortho camera (pos ~(0,22,17) looking at the
+// origin, frustum half-height ~29u): centre projects into the upper third of the
+// frame, sitting in the sky *behind* the island rim.
+export const AURORA_FX = {
+  width: 38, // ribbon width — gradient spans the visible frame (half-width ~13.5)
+  height: 11, // ribbon height (soft vertical falloff fades the edges)
+  segments: 30, // horizontal segments (smooth arc + colour gradient)
+  ySegments: 6, // vertical segments (for the soft top/bottom fade)
+  arc: 5, // how far the ends bow toward the camera (units)
+  y: 8, // height of the ribbon centre
+  z: -20, // pushed back behind the island rim (rim ~z -12.75)
+  maxOpacity: 0.55, // opacity at full night
+} as const;
+
+// --- Quest tuning (Phase 3) ------------------------------------------------
+// Numeric targets for the onboarding quest chain (predicates carry no magics).
+export const QUEST_TUNING = {
+  popTarget: 10, // "grow the camp" objective
+  dayTarget: 5, // "survive to day N" objective
+} as const;

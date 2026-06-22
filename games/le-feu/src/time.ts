@@ -4,7 +4,7 @@
 // scalar tells the villager AI when to leave the fields and gather at the fire.
 import * as THREE from 'three';
 import type { OrthoApp } from '@games-lab/shared';
-import { CYCLE, CYCLE_TOTAL, LIGHTS, SKY } from './config';
+import { CYCLE, CYCLE_TOTAL, LIGHTS, SKY, AURORA_FX } from './config';
 import type { SceneRig } from './scene';
 
 export type Phase = 'day' | 'dusk' | 'night' | 'dawn';
@@ -92,4 +92,11 @@ export function applyLighting(app: OrthoApp, rig: SceneRig, daylight: number, fl
 
   _sky.lerpColors(_skyNight, _skyDay, daylight);
   app.renderer.setClearColor(_sky);
+
+  // Aurora: invisible by day, fades in as night falls. A slow opacity shimmer
+  // keeps it alive without a per-vertex shader.
+  const auroraMat = rig.aurora.material as THREE.MeshBasicMaterial;
+  const night = 1 - daylight;
+  const shimmer = 0.85 + 0.15 * Math.sin(flickerT * 0.4);
+  auroraMat.opacity = AURORA_FX.maxOpacity * night * night * shimmer;
 }

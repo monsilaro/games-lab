@@ -4,8 +4,8 @@
 // arrive at the fire to join. Building-centric assignment (tap a building → +/−).
 import * as THREE from 'three';
 import { createOrthoApp, startGameLoop } from '@games-lab/shared';
-import { SIM_STEP, MAX_STEPS_PER_FRAME, PALETTE, CAMERA, BUILD_ORDER } from './config';
-import { setupScene } from './scene';
+import { SIM_STEP, MAX_STEPS_PER_FRAME, PALETTE, CAMERA, BUILD_ORDER, type BuildingKind } from './config';
+import { setupScene, scatterDecor } from './scene';
 import { createCameraController } from './camera';
 import { createGrid, screenToCell, setOccupied, type Cell } from './grid';
 import { createClock, tickClock, daylightOf, phaseOf, phaseLabel, isNightForVillagers, applyLighting } from './time';
@@ -16,6 +16,7 @@ import { createVillage, tickVillage, updateVillageVisuals } from './village/ai';
 import { assignNearestIdle, unassign, unassignOne } from './village/jobs';
 import { createRecruiter, tickRecruit, population, popCap } from './village/recruit';
 import { createHud, type MarkerItem } from './hud';
+import { createQuestState, tickQuests, currentQuest, QUESTS, type QuestSnapshot } from './quests';
 
 // --- Boot ------------------------------------------------------------------
 const app = createOrthoApp({ worldHeight: CAMERA.seedHeight, clearColor: PALETTE.night });
@@ -25,6 +26,9 @@ const camera = createCameraController(app);
 const grid = createGrid();
 // Reserve the centre cell: the fire lives there, so nothing spawns/builds on it.
 setOccupied(grid, grid.centre, grid.centre, true);
+// Dress the island rim with static props (claims their cells before anything
+// else spawns), then drop the fire in the centre.
+scatterDecor(app.scene, grid);
 const fire = createFire();
 app.scene.add(fire.group);
 
@@ -34,12 +38,36 @@ const village = createVillage(app.scene, grid);
 const recruiter = createRecruiter();
 
 const clock = createClock();
+const questState = createQuestState();
+let started = false; // sim is frozen behind the intro overlay until "Commencer"
 
 // --- Helpers ---------------------------------------------------------------
 function idleCount(): number {
   let n = 0;
   for (const v of village.villagers) if (!v.job && !v.recruiting) n++;
   return n;
+}
+
+/** A pure read of current state for the quest predicates (cheap, HUD-cadence). */
+function buildSnapshot(): QuestSnapshot {
+  const buildingsByKind: Record<BuildingKind, number> = { production: 0, storage: 0, house: 0, fire: 0 };
+  const buildingCount: Record<string, number> = {};
+  let assignedWorkers = 0;
+  for (const b of buildings.instances) {
+    buildingsByKind[b.def.kind]++;
+    buildingCount[b.def.id] = (buildingCount[b.def.id] ?? 0) + 1;
+    if (b.def.kind === 'production') assignedWorkers += b.assigned.length;
+  }
+  return {
+    day: clock.day,
+    pop: population(village),
+    popCap: popCap(buildings.houseCapacity()),
+    idle: idleCount(),
+    counts: { ...store.counts },
+    buildingsByKind,
+    buildingCount,
+    assignedWorkers,
+  };
 }
 
 /** Permanent death from famine: free their job, drop them from the world. */
@@ -110,8 +138,15 @@ const hud = createHud({
   onCloseSheet() {
     closeSheet();
   },
+  onStartGame() {
+    started = true;
+    hud.hideIntro();
+  },
 });
 hud.setSpeedActive(speedMul);
+// Frame the game before it runs: show the intro with the first objective.
+hud.showIntro(currentQuest(questState));
+hud.setQuest(currentQuest(questState), `1/${QUESTS.length}`);
 
 // --- Pointer / gesture routing --------------------------------------------
 // Two fingers → pinch zoom. One finger in build mode → preview/commit. One finger
@@ -240,7 +275,7 @@ let flickerT = 0; // free-running real time so the fire pulses even when paused
 startGameLoop((dt) => {
   flickerT += dt;
 
-  acc += dt * speedMul; // pause => 0 => sim frozen
+  acc += started ? dt * speedMul : 0; // pause (or intro) => 0 => sim frozen
   let steps = 0;
   while (acc >= SIM_STEP && steps < MAX_STEPS_PER_FRAME) {
     tickClock(clock, SIM_STEP);
@@ -255,7 +290,7 @@ startGameLoop((dt) => {
   // Render-rate visuals (independent of sim step).
   const daylight = daylightOf(clock);
   applyLighting(app, rig, daylight, flickerT);
-  fire.update(flickerT);
+  fire.update(flickerT, dt);
   const night = isNightForVillagers(clock);
   updateVillageVisuals(village, flickerT, dt, night, speedMul > 0);
   app.renderer.render(app.scene, app.camera);
@@ -268,5 +303,13 @@ startGameLoop((dt) => {
     hud.setStatus(store, pop, popCap(buildings.houseCapacity()), idleCount(), isStarving(store));
     if (selectedBuilding) hud.refreshSheet(selectedBuilding, idleCount());
     hud.updateMarkers(projectMarkers());
+
+    // Quests: evaluate on the HUD cadence (a pure read; decoupled from the sim).
+    if (started) {
+      const snap = buildSnapshot();
+      const justDone = tickQuests(questState, snap);
+      if (justDone) hud.questToast(justDone);
+      hud.setQuest(currentQuest(questState), `${Math.min(questState.index + 1, QUESTS.length)}/${QUESTS.length}`);
+    }
   }
 });

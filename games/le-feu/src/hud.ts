@@ -13,6 +13,7 @@ import {
 } from './config';
 import { canAfford, type Store } from './resources';
 import type { BuildingInstance } from './buildings';
+import type { Quest } from './quests';
 
 export interface HudCallbacks {
   onSpeed(multiplier: number): void;
@@ -21,6 +22,7 @@ export interface HudCallbacks {
   onAssignPlus(): void;
   onAssignMinus(): void;
   onCloseSheet(): void;
+  onStartGame(): void;
 }
 
 export interface MarkerItem {
@@ -39,6 +41,10 @@ export interface Hud {
   refreshSheet(building: BuildingInstance, idle: number): void;
   closeSheet(): void;
   updateMarkers(items: MarkerItem[]): void;
+  setQuest(quest: Quest | null, stepLabel: string): void;
+  questToast(quest: Quest): void;
+  showIntro(first: Quest | null): void;
+  hideIntro(): void;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -130,6 +136,16 @@ export function createHud(cb: HudCallbacks): Hud {
   const markersEl = el('le-feu-markers');
   const markerPool: HTMLSpanElement[] = [];
 
+  // --- Quest panel + toast + intro ---
+  const questTitle = el('le-feu-quest-title');
+  const questDesc = el('le-feu-quest-desc');
+  const questStep = el('le-feu-quest-step');
+  const toastEl = el('le-feu-quest-toast');
+  let toastTimer = 0;
+  const introEl = el('le-feu-intro');
+  const introObj = el('le-feu-intro-obj');
+  el<HTMLButtonElement>('le-feu-intro-start').addEventListener('click', () => cb.onStartGame());
+
   return {
     setClock(day, phase) {
       dayEl.textContent = `Jour ${day}`;
@@ -205,6 +221,30 @@ export function createHud(cb: HudCallbacks): Hud {
         span.style.display = 'block';
       }
       for (let i = items.length; i < markerPool.length; i++) markerPool[i]!.style.display = 'none';
+    },
+    setQuest(quest, stepLabel) {
+      if (!quest) {
+        questTitle.textContent = 'Le camp prospère ✨';
+        questDesc.textContent = 'Tous les objectifs sont accomplis — continue à le faire grandir.';
+        questStep.textContent = '';
+        return;
+      }
+      questTitle.textContent = quest.title;
+      questDesc.textContent = quest.desc;
+      questStep.textContent = stepLabel;
+    },
+    questToast(quest) {
+      toastEl.textContent = `✓ ${quest.title}`;
+      toastEl.classList.add('le-feu-toast-show');
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toastEl.classList.remove('le-feu-toast-show'), 2200);
+    },
+    showIntro(first) {
+      introObj.textContent = first ? `Premier objectif : ${first.title}` : '';
+      introEl.style.display = 'flex';
+    },
+    hideIntro() {
+      introEl.style.display = 'none';
     },
   };
 }
