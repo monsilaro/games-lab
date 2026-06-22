@@ -18,9 +18,13 @@ import {
   CELL_COUNT,
   FLASH_DUR,
   BORDER_TINT,
+  NODE_COUNT,
 } from './config';
 import type { Grid } from './grid';
 import type { Sim } from './sim';
+
+// Seconds a node ring stays "popped" (enlarged + brightened) after it flips owner.
+const NODE_POP_DUR = 0.6;
 
 export interface Renderer {
   ctx: CanvasRenderingContext2D;
@@ -29,6 +33,7 @@ export interface Renderer {
   image: ImageData;
   buf: Uint32Array;
   flash: Float32Array; // per-cell capture-flash time remaining
+  nodePop: Float32Array; // per-node 1→0 "just changed hands" pop, decays each frame
   dx: number;
   dy: number;
   dw: number;
@@ -104,6 +109,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     image,
     buf,
     flash: new Float32Array(CELL_COUNT),
+    nodePop: new Float32Array(NODE_COUNT),
     dx: 0,
     dy: 0,
     dw: GRID_W,
@@ -113,6 +119,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
 export function clearFlash(r: Renderer): void {
   r.flash.fill(0);
+  r.nodePop.fill(0);
+}
+
+/** Kick node `n`'s ring into a brief "just changed hands" pop. */
+export function flashNodeCapture(r: Renderer, n: number): void {
+  if (n >= 0 && n < r.nodePop.length) r.nodePop[n] = 1;
 }
 
 /** Recompute the buffer with glow + flash, blit it, then draw node rings. */
@@ -151,12 +163,13 @@ export function renderFrame(
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(r.off, r.dx, r.dy, r.dw, r.dh);
 
-  drawNodes(r, grid, timeSec);
+  drawNodes(r, grid, dt, timeSec);
 }
 
-function drawNodes(r: Renderer, grid: Grid, timeSec: number): void {
+function drawNodes(r: Renderer, grid: Grid, dt: number, timeSec: number): void {
   const ctx = r.ctx;
   const nodes = grid.nodes;
+  const pop = r.nodePop;
   const cell = r.dw / GRID_W;
   const baseR = Math.max(7, cell * 2.2);
   for (let n = 0; n < nodes.length; n++) {
@@ -166,16 +179,22 @@ function drawNodes(r: Renderer, grid: Grid, timeSec: number): void {
     const sx = r.dx + ((gx + 0.5) / GRID_W) * r.dw;
     const sy = r.dy + ((gy + 0.5) / GRID_H) * r.dh;
     const pulse = 0.5 + 0.5 * Math.sin(timeSec * 4 + n * 1.3);
-    const rad = baseR * (1 + 0.35 * pulse);
+    // Capture pop: a fat, bright burst that decays over NODE_POP_DUR.
+    const p = pop[n];
+    if (p > 0) {
+      const np = p - dt / NODE_POP_DUR;
+      pop[n] = np > 0 ? np : 0;
+    }
+    const rad = baseR * (1 + 0.35 * pulse + 0.9 * p);
     const o = grid.owner[idx];
     const held = o !== OWNER_NEUTRAL && o !== OWNER_WATER;
     const col = held ? cssOwner(o) : cssHex(COLOR_NODE);
 
     ctx.beginPath();
     ctx.arc(sx, sy, rad, 0, Math.PI * 2);
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.5 + 3 * p;
     ctx.strokeStyle = col;
-    ctx.globalAlpha = 0.55 + 0.35 * pulse;
+    ctx.globalAlpha = Math.min(1, 0.55 + 0.35 * pulse + 0.45 * p);
     ctx.stroke();
     ctx.globalAlpha = 1;
 
