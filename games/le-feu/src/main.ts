@@ -185,8 +185,10 @@ function updatePreview(x: number, y: number): void {
 
 function commitAt(x: number, y: number): void {
   const cell = screenToCell(grid, app.camera, x, y);
-  if (cell) buildings.place(grid, cell, store);
+  const placed = cell ? buildings.place(grid, cell, store) : null;
   buildings.hidePreview();
+  // One tap = one building: drop out of build mode after a successful placement.
+  if (placed) enterBuildMode(false);
 }
 
 function selectAt(x: number, y: number): void {
