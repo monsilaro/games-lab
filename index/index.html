@@ -152,6 +152,32 @@
           card.href = url.toString();
         });
       }
+
+      // Each card carries its game folder's last-commit date (data-updated, an
+      // ISO string injected at build time). Render it as a relative "il y a …"
+      // label computed NOW, so it stays accurate on every visit.
+      const rtf = new Intl.RelativeTimeFormat('fr', { numeric: 'always' });
+      function relTimeFr(iso) {
+        const then = new Date(iso).getTime();
+        if (Number.isNaN(then)) return '';
+        const sec = (Date.now() - then) / 1000;
+        if (sec < 60) return "à l’instant";
+        const min = sec / 60;
+        if (min < 60) return rtf.format(-Math.round(min), 'minute');
+        const hr = min / 60;
+        if (hr < 24) return rtf.format(-Math.round(hr), 'hour');
+        const day = hr / 24;
+        if (day < 7) return rtf.format(-Math.round(day), 'day');
+        const week = day / 7;
+        if (week < 4.345) return rtf.format(-Math.round(week), 'week');
+        const month = day / 30.437;
+        if (month < 12) return rtf.format(-Math.round(month), 'month');
+        return rtf.format(-Math.round(day / 365.25), 'year');
+      }
+      for (const el of document.querySelectorAll('.card-updated')) {
+        const iso = el.getAttribute('data-updated');
+        if (iso) el.textContent = relTimeFr(iso);
+      }
     </script>
   </body>
 </html>
