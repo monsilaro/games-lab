@@ -64,8 +64,8 @@ export const LIGHTS = {
     distance: 30,
     decay: 1.4,
     height: 2.2, // y of the light above the logs
-    flickerAmp: 0.12, // ± fraction of intensity, fast pulse
-    flickerHz: 7,
+    flickerAmp: 0.07, // ± fraction of intensity, gentle pulse
+    flickerHz: 3,
   },
   // Per-villager handheld torch, lit only at night.
   torch: {
@@ -296,7 +296,9 @@ export const DECOR = {
 // system (one fixed pool, one attribute upload per frame — cheap on mobile).
 export const FIRE_FX = {
   glowRadius: 2.4, // ground glow disc radius (world units)
-  glowIntensity: 0.5, // base emissive of the glow disc (pulsed by the flicker)
+  glowIntensity: 0.5, // base emissive of the glow disc
+  glowPulseHz: 0.5, // slow, calm breathing of the glow (NOT the fast flame flicker)
+  glowPulseAmp: 0.06, // ± fraction — kept tiny so the centre never strobes
   emberCount: 40, // particle pool size
   emberRise: 1.7, // base upward speed (units/sec)
   emberDrift: 0.5, // horizontal curl amplitude (units/sec)
