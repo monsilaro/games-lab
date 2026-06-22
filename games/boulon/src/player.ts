@@ -8,7 +8,7 @@ import * as C from './config';
 import { addBody, CAT, toTick } from './physics';
 import { buildRobot } from './robotFactory';
 
-const { Bodies, Body } = Matter;
+const { Bodies, Body, Sleeping } = Matter;
 
 export class Player {
   readonly body: Matter.Body;
@@ -24,6 +24,7 @@ export class Player {
       label: 'player',
       frictionAir: 0,
       inertia: Infinity, // never spin from collisions; we orient the mesh by aim
+      sleepThreshold: Infinity, // driven by setVelocity each frame — must never sleep
       collisionFilter: { category: CAT.player, mask: CAT.wall | CAT.target },
     });
     this.mesh = buildRobot({
@@ -40,6 +41,10 @@ export class Player {
 
   /** Drive velocity from a move vector (matter space, magnitude 0..1). */
   move(mx: number, my: number): void {
+    // Belt-and-suspenders: setVelocity never wakes a sleeping body, so if it
+    // somehow slept, wake it before driving it (the body also has
+    // sleepThreshold: Infinity, so this should never actually trigger).
+    if ((mx !== 0 || my !== 0) && this.body.isSleeping) Sleeping.set(this.body, false);
     Body.setVelocity(this.body, {
       x: toTick(mx * C.PLAYER.moveSpeed),
       y: toTick(my * C.PLAYER.moveSpeed),
