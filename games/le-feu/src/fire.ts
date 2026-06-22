@@ -127,12 +127,15 @@ export function createFire(): Fire {
       const fs = 0.4 + 0.6 * strength;
       outer.scale.set((1 + b * 0.06) * fs, s * fs, (1 + b * 0.06) * fs);
       inner.scale.set(fs, (1 + a * f.flickerAmp * 1.4) * fs, fs);
-      core.scale.set(fs, (1 + a * 0.2) * fs, fs);
+      core.scale.set(fs, (1 + a * 0.08) * fs, fs);
       outer.rotation.y = t * 0.6;
       inner.rotation.y = -t * 0.9;
       // Glow disc spans the protective ring so the lit ground = where shades stop.
       glow.scale.setScalar(radius / FIRE_FX.glowRadius);
-      glowMat.opacity = FIRE_FX.glowIntensity * (0.5 + 0.5 * strength) * (1 + (a + b) * 0.5);
+      // Slow, gentle breathing — NOT the fast flame flicker, which strobed the
+      // centre and was tiring to look at.
+      const breathe = 1 + Math.sin(t * Math.PI * 2 * FIRE_FX.glowPulseHz) * FIRE_FX.glowPulseAmp;
+      glowMat.opacity = FIRE_FX.glowIntensity * (0.5 + 0.5 * strength) * breathe;
 
       // Embers: rise, curl, fade (additive → dimming colour reads as a fade-out).
       const emberK = 0.35 + 0.65 * strength; // fewer/dimmer embers when weak

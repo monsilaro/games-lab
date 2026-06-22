@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Full history so the index can stamp each game card with its
+          # folder's last-commit date (see index/vite.config.ts).
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
 

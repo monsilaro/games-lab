@@ -29,6 +29,8 @@ export interface Grid {
   landCount: number;
   /** Power-node cell indices — holding one grants bonus income. Start neutral. */
   nodes: Int32Array;
+  /** 1 at every power-node cell, else 0 — O(1) "is this a node?" test in the sim. */
+  isNode: Uint8Array;
 }
 
 export function idx(x: number, y: number): number {
@@ -78,8 +80,10 @@ export function createGrid(seed = 1): Grid {
 
   // Power nodes: neutral cells out in the map, away from spawns and each other.
   const nodes = placeNodes(seed, spawns, NODE_COUNT);
+  const isNode = new Uint8Array(CELL_COUNT);
+  for (let n = 0; n < nodes.length; n++) isNode[nodes[n]] = 1;
 
-  return { owner, balance, ownedCount, landCount: CELL_COUNT - waterCount, nodes };
+  return { owner, balance, ownedCount, landCount: CELL_COUNT - waterCount, nodes, isNode };
 }
 
 interface Pt {

@@ -27,6 +27,7 @@ import {
   ECO_SPEED,
   BOT_ECO_HANDICAP,
   NODE_BONUS_INCOME,
+  NODE_RADIUS,
   DECISION_INTERVAL,
 } from './config';
 import type { Grid } from './grid';
@@ -322,6 +323,28 @@ function conquer(sim: Sim, o: number, t: number): void {
   if (x < GRID_W - 1) refreshBorder(sim, t + 1);
   if (y > 0) refreshBorder(sim, t - GRID_W);
   if (y < GRID_H - 1) refreshBorder(sim, t + GRID_W);
+
+  // Taking a power-node cell instantly claims its district (a sticky, visible
+  // foothold). Recursion depth 1: NODE_MIN_DIST ≫ NODE_RADIUS, so none of the
+  // stamped cells is itself a node.
+  if (grid.isNode[t] && prev !== o) stampDistrict(sim, o, x, y);
+}
+
+/** Flip every non-water cell within NODE_RADIUS of (cx,cy) to owner `o`. */
+function stampDistrict(sim: Sim, o: number, cx: number, cy: number): void {
+  const owner = sim.grid.owner;
+  for (let dy = -NODE_RADIUS; dy <= NODE_RADIUS; dy++) {
+    const y = cy + dy;
+    if (y < 0 || y >= GRID_H) continue;
+    for (let dx = -NODE_RADIUS; dx <= NODE_RADIUS; dx++) {
+      const x = cx + dx;
+      if (x < 0 || x >= GRID_W) continue;
+      const c = y * GRID_W + x;
+      const od = owner[c];
+      if (od === o || od === OWNER_WATER) continue; // already ours / impassable
+      conquer(sim, o, c);
+    }
+  }
 }
 
 /** Recompute whether a cell is on its owner's front; push on a 0→1 edge. */

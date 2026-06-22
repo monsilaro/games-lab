@@ -4,7 +4,7 @@
 // arrive at the fire to join. Building-centric assignment (tap a building → +/−).
 import * as THREE from 'three';
 import { createOrthoApp, startGameLoop } from '@games-lab/shared';
-import { SIM_STEP, MAX_STEPS_PER_FRAME, PALETTE, CAMERA, BUILD_ORDER, HEARTH, type BuildingKind } from './config';
+import { SIM_STEP, MAX_STEPS_PER_FRAME, PALETTE, CAMERA, BUILD_ORDER, HEARTH, QUEST_TUNING, type BuildingKind } from './config';
 import { setupScene, scatterDecor } from './scene';
 import { createCameraController } from './camera';
 import { createGrid, screenToCell, setOccupied, type Cell } from './grid';
@@ -45,6 +45,8 @@ const threats = createThreats(app.scene);
 const clock = createClock();
 const questState = createQuestState();
 let started = false; // sim is frozen behind the intro overlay until "Commencer"
+let ended: 'none' | 'defeat' | 'victory' = 'none'; // sim freezes while an end card shows
+let victoryShown = false; // the victory card only fires once (then endless survival)
 
 // --- Helpers ---------------------------------------------------------------
 function idleCount(): number {
@@ -150,6 +152,13 @@ const hud = createHud({
     started = true;
     hud.hideIntro();
   },
+  onRestart() {
+    location.reload();
+  },
+  onContinue() {
+    ended = 'none'; // dismiss the victory card and keep playing (endless)
+    hud.hideEnd();
+  },
 });
 hud.setSpeedActive(speedMul);
 // Frame the game before it runs: show the intro with the first objective.
@@ -185,8 +194,10 @@ function updatePreview(x: number, y: number): void {
 
 function commitAt(x: number, y: number): void {
   const cell = screenToCell(grid, app.camera, x, y);
-  if (cell) buildings.place(grid, cell, store);
+  const placed = cell ? buildings.place(grid, cell, store) : null;
   buildings.hidePreview();
+  // One tap = one building: drop out of build mode after a successful placement.
+  if (placed) enterBuildMode(false);
 }
 
 function selectAt(x: number, y: number): void {
@@ -283,7 +294,7 @@ let flickerT = 0; // free-running real time so the fire pulses even when paused
 startGameLoop((dt) => {
   flickerT += dt;
 
-  acc += started ? dt * speedMul : 0; // pause (or intro) => 0 => sim frozen
+  acc += started && ended === 'none' ? dt * speedMul : 0; // pause/intro/end => frozen
   let steps = 0;
   while (acc >= SIM_STEP && steps < MAX_STEPS_PER_FRAME) {
     tickClock(clock, SIM_STEP);
@@ -297,6 +308,18 @@ startGameLoop((dt) => {
     steps++;
   }
   if (acc > SIM_STEP) acc = 0; // drop backlog rather than spiral
+
+  // End-of-game checks (only while actually playing).
+  if (started && ended === 'none') {
+    if (population(village) === 0) {
+      ended = 'defeat';
+      hud.showEnd('defeat', clock.day);
+    } else if (clock.day >= QUEST_TUNING.dayTarget && !victoryShown) {
+      ended = 'victory';
+      victoryShown = true;
+      hud.showEnd('victory', clock.day);
+    }
+  }
 
   // Render-rate visuals (independent of sim step).
   const daylight = daylightOf(clock);

@@ -82,8 +82,41 @@
       #emprise-hud-percent {
         color: #ff9f1c;
       }
-      #emprise-hud-fps {
-        color: #caf0f8;
+      #emprise-hud-nodes {
+        color: #ffe066;
+      }
+
+      /* Win-progress bar: full width = the 50% win line. Two stacked fills
+         (leading rival behind, player in front) animate toward that line. */
+      .emprise-progress {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: calc(env(safe-area-inset-top, 0px) + 66px);
+        z-index: 10;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(10, 17, 40, 0.72);
+        border: 1px solid rgba(255, 159, 28, 0.18);
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .emprise-progress-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0%;
+        border-radius: 999px;
+        transition: width 0.2s linear;
+      }
+      .emprise-progress-player {
+        background: linear-gradient(90deg, #ff9f1c, #ffd166);
+        z-index: 2;
+      }
+      .emprise-progress-rival {
+        background: rgba(255, 60, 60, 0.7);
+        z-index: 1;
       }
 
       /* First-run hint, fades out on first touch. */
@@ -209,10 +242,37 @@
         );
       }
 
+      /* Node-captured gold vignette (flashed from JS) — the reward twin of hurt. */
+      #emprise-gain {
+        position: fixed;
+        inset: 0;
+        z-index: 8;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(255, 209, 102, 0) 45%,
+          rgba(255, 195, 70, 0.5) 100%
+        );
+      }
+
       #emprise-build-stamp {
         position: fixed;
         z-index: 5;
         right: calc(env(safe-area-inset-right, 0px) + 8px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+        font-size: 10px;
+        font-family: ui-monospace, monospace;
+        color: rgba(125, 138, 165, 0.5);
+        pointer-events: none;
+      }
+
+      /* FPS — a dev metric, tucked in the corner (the perf budget is the point). */
+      #emprise-hud-fps {
+        position: fixed;
+        z-index: 5;
+        left: calc(env(safe-area-inset-left, 0px) + 8px);
         bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
         font-size: 10px;
         font-family: ui-monospace, monospace;
@@ -224,6 +284,7 @@
   <body>
     <canvas id="emprise-game-canvas"></canvas>
     <div id="emprise-hurt"></div>
+    <div id="emprise-gain"></div>
 
     <div class="emprise-hud">
       <div class="emprise-stat">
@@ -235,13 +296,19 @@
         <span class="emprise-value" id="emprise-hud-percent">0%</span>
       </div>
       <div class="emprise-stat">
-        <span class="emprise-label">Rivaux</span>
-        <span class="emprise-value" id="emprise-hud-rivals">0</span>
+        <span class="emprise-label">Nodes</span>
+        <span class="emprise-value" id="emprise-hud-nodes">0/5</span>
       </div>
       <div class="emprise-stat">
-        <span class="emprise-label">FPS</span>
-        <span class="emprise-value" id="emprise-hud-fps">60</span>
+        <span class="emprise-label">Rang</span>
+        <span class="emprise-value" id="emprise-hud-rank">1/1</span>
       </div>
+    </div>
+
+    <!-- Progress toward the 50% win line: your share vs the leading rival's. -->
+    <div class="emprise-progress" id="emprise-progress">
+      <div class="emprise-progress-fill emprise-progress-rival" id="emprise-progress-rival"></div>
+      <div class="emprise-progress-fill emprise-progress-player" id="emprise-progress-player"></div>
     </div>
 
     <div class="emprise-hint" id="emprise-hint">Tu t'étends seul · maintiens pour attaquer</div>
@@ -258,6 +325,7 @@
     </div>
 
     <div id="emprise-build-stamp"></div>
+    <div id="emprise-hud-fps">60</div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
