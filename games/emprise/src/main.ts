@@ -9,7 +9,7 @@ import {
 } from '@games-lab/shared';
 import { SIM_STEP, OWNER_PLAYER, WIN_PERCENT } from './config';
 import { createGrid, type Grid } from './grid';
-import { createSim, setTarget, setGreedyNeutral, simTick, clearDirty, type Sim } from './sim';
+import { createSim, setTarget, setEngage, simTick, clearDirty, type Sim } from './sim';
 import { aiStep } from './ai';
 import {
   createRenderer,
@@ -49,7 +49,7 @@ let lastScore = 0;
 let nodeOwners = snapshotNodeOwners();
 
 const LEADERBOARD_GAME = 'emprise';
-setGreedyNeutral(sim, OWNER_PLAYER); // auto-expand into neutral by default
+setEngage(sim, OWNER_PLAYER); // auto: attack adjacent enemies first, else grow neutral
 
 function snapshotNodeOwners(): Uint8Array {
   const a = new Uint8Array(grid.nodes.length);
@@ -84,7 +84,7 @@ function steer(e: PointerEvent): void {
 }
 function release(): void {
   pointerDown = false;
-  setGreedyNeutral(sim, OWNER_PLAYER);
+  setEngage(sim, OWNER_PLAYER);
 }
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
@@ -223,7 +223,7 @@ function newGame(): void {
   sim = createSim(grid);
   landCount = grid.landCount;
   totalPlayers = sim.activeOwners.length;
-  setGreedyNeutral(sim, OWNER_PLAYER);
+  setEngage(sim, OWNER_PLAYER);
   running = true;
   elapsed = 0;
   acc = 0;

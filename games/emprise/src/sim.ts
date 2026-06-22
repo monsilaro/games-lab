@@ -36,7 +36,8 @@ import type { Grid } from './grid';
 export const MODE_IDLE = 0; // bank Balance, don't push (bot DEFEND / surrounded)
 export const MODE_DIRECTED = 1; // advance the front toward target[o] (steer / ATTACK)
 export const MODE_GREEDY = 2; // grab every affordable fringe cell (neutral + enemy) — bot EXPAND
-export const MODE_GREEDY_NEUTRAL = 3; // grab neutral only, omnidirectional — the player's default
+export const MODE_GREEDY_NEUTRAL = 3; // grab neutral only, omnidirectional
+export const MODE_ENGAGE = 4; // player default: attack adjacent enemies FIRST, then grab neutral
 
 export interface Sim {
   grid: Grid;
@@ -128,6 +129,9 @@ export function setGreedy(sim: Sim, o: number): void {
 }
 export function setGreedyNeutral(sim: Sim, o: number): void {
   sim.mode[o] = MODE_GREEDY_NEUTRAL;
+}
+export function setEngage(sim: Sim, o: number): void {
+  sim.mode[o] = MODE_ENGAGE;
 }
 export function setIdle(sim: Sim, o: number): void {
   sim.mode[o] = MODE_IDLE;
@@ -249,11 +253,29 @@ function processOwner(sim: Sim, o: number): void {
 
   if (fl === 0) return;
 
-  // 2. Directed owners take the cells nearest their target first.
+  // 2. Ordering. Directed owners take the cells nearest their target first.
+  //    MODE_ENGAGE (player default) attacks first: partition enemy cells ahead
+  //    of neutral ones (in-place, two-pointer) so the conquest loop spends on
+  //    rivals before the void. Intra-group order doesn't matter — cost ∝ the
+  //    defender's strength, so weak enemies are the affordable ones anyway.
   if (m === MODE_DIRECTED) {
     cmpTx = sim.targetX[o];
     cmpTy = sim.targetY[o];
     fringe.subarray(0, fl).sort(cmpDistToTarget);
+  } else if (m === MODE_ENGAGE) {
+    let lo = 0;
+    let hi = fl - 1;
+    while (lo < hi) {
+      while (lo < hi && owner[fringe[lo]] !== OWNER_NEUTRAL) lo++; // enemy: keep left
+      while (lo < hi && owner[fringe[hi]] === OWNER_NEUTRAL) hi--; // neutral: keep right
+      if (lo < hi) {
+        const tmp = fringe[lo];
+        fringe[lo] = fringe[hi];
+        fringe[hi] = tmp;
+        lo++;
+        hi--;
+      }
+    }
   }
 
   // 3. Conquer affordable cells, spending Balance per cell (force-scaled cost).
