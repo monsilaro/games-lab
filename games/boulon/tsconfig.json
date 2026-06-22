@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // @types/matter-js is an `export =` CommonJS shape; the default-import
+    // interop matches what Vite does at runtime.
+    "esModuleInterop": true
+  },
+  "include": ["src", "vite.config.ts"]
+}

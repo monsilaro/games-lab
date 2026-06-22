@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Boulon" />
+    <meta name="theme-color" content="#ffb627" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" href="./apple-touch-icon.png" />
+    <title>Boulon</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #e9edf2;
+        font-family: -apple-system, system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        touch-action: none;
+        z-index: 0;
+      }
+      /* HUD: small kill/hit counter, top-centre. */
+      #boulon-hud {
+        position: fixed;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 14px);
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 22px;
+        font-weight: 800;
+        color: #2a2f3a;
+        text-shadow: 0 2px 0 rgba(255, 255, 255, 0.5);
+        pointer-events: none;
+      }
+      #boulon-build-stamp {
+        position: fixed;
+        z-index: 10;
+        right: calc(env(safe-area-inset-right, 0px) + 8px);
+        top: calc(env(safe-area-inset-top, 0px) + 8px);
+        font-size: 10px;
+        color: rgba(40, 47, 58, 0.45);
+        pointer-events: none;
+      }
+      /* Twin-stick virtual joysticks. Two independent floating sticks: the
+         base appears wherever the thumb lands, the knob tracks within radius.
+         Hidden until a thumb is down. */
+      .boulon-stick-base,
+      .boulon-stick-knob {
+        position: fixed;
+        z-index: 12;
+        display: none;
+        pointer-events: none;
+        border-radius: 50%;
+        left: 0;
+        top: 0;
+      }
+      .boulon-stick-base {
+        width: 132px;
+        height: 132px;
+        margin: -66px 0 0 -66px;
+        border: 3px solid rgba(40, 47, 58, 0.18);
+        background: rgba(255, 255, 255, 0.16);
+      }
+      .boulon-stick-knob {
+        width: 60px;
+        height: 60px;
+        margin: -30px 0 0 -30px;
+        background: rgba(255, 255, 255, 0.5);
+        border: 2px solid rgba(40, 47, 58, 0.28);
+      }
+      /* Right (aim/fire) stick tinted warm so the two thumbs read distinctly. */
+      #boulon-stick-aim-base {
+        border-color: rgba(255, 110, 40, 0.45);
+      }
+      #boulon-stick-aim-knob {
+        background: rgba(255, 150, 60, 0.55);
+        border-color: rgba(255, 110, 40, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="boulon-hud"></div>
+    <div id="boulon-build-stamp"></div>
+    <!-- Left stick = move -->
+    <div id="boulon-stick-move-base" class="boulon-stick-base"></div>
+    <div id="boulon-stick-move-knob" class="boulon-stick-knob"></div>
+    <!-- Right stick = aim + fire -->
+    <div id="boulon-stick-aim-base" class="boulon-stick-base"></div>
+    <div id="boulon-stick-aim-knob" class="boulon-stick-knob"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
