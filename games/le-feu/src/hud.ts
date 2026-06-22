@@ -23,6 +23,8 @@ export interface HudCallbacks {
   onAssignMinus(): void;
   onCloseSheet(): void;
   onStartGame(): void;
+  onRestart(): void;
+  onContinue(): void;
 }
 
 export interface MarkerItem {
@@ -46,6 +48,8 @@ export interface Hud {
   questToast(quest: Quest): void;
   showIntro(first: Quest | null): void;
   hideIntro(): void;
+  showEnd(kind: 'defeat' | 'victory', day: number): void;
+  hideEnd(): void;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -150,6 +154,12 @@ export function createHud(cb: HudCallbacks): Hud {
   const introEl = el('le-feu-intro');
   const introObj = el('le-feu-intro-obj');
   el<HTMLButtonElement>('le-feu-intro-start').addEventListener('click', () => cb.onStartGame());
+  const endEl = el('le-feu-end');
+  const endTitle = el('le-feu-end-title');
+  const endMsg = el('le-feu-end-msg');
+  const endContinue = el<HTMLButtonElement>('le-feu-end-continue');
+  endContinue.addEventListener('click', () => cb.onContinue());
+  el<HTMLButtonElement>('le-feu-end-restart').addEventListener('click', () => cb.onRestart());
 
   return {
     setClock(day, phase) {
@@ -255,6 +265,23 @@ export function createHud(cb: HudCallbacks): Hud {
     },
     hideIntro() {
       introEl.style.display = 'none';
+    },
+    showEnd(kind, day) {
+      endEl.classList.toggle('le-feu-defeat', kind === 'defeat');
+      endEl.classList.toggle('le-feu-victory', kind === 'victory');
+      if (kind === 'defeat') {
+        endTitle.textContent = 'Le camp est tombé';
+        endMsg.textContent = `Les ténèbres ont eu raison du feu au Jour ${day}. Il ne reste plus personne autour des cendres.`;
+        endContinue.style.display = 'none';
+      } else {
+        endTitle.textContent = 'Le camp a tenu ✨';
+        endMsg.textContent = `Le feu a brûlé jusqu'au Jour ${day} et le village prospère. Continue en mode survie, ou recommence une nouvelle veillée.`;
+        endContinue.style.display = 'inline-block';
+      }
+      endEl.style.display = 'flex';
+    },
+    hideEnd() {
+      endEl.style.display = 'none';
     },
   };
 }

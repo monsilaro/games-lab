@@ -434,6 +434,70 @@
         border-radius: 14px;
         box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
       }
+      /* End-of-game overlay (defeat / victory). */
+      #le-feu-end {
+        position: fixed;
+        inset: 0;
+        z-index: 31;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(10, 17, 40, 0.86);
+        -webkit-backdrop-filter: blur(3px);
+        backdrop-filter: blur(3px);
+      }
+      #le-feu-end-card {
+        width: min(90vw, 380px);
+        background: rgba(16, 24, 48, 0.97);
+        border: 1px solid #2a3656;
+        border-radius: 20px;
+        padding: 24px 22px;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+      }
+      #le-feu-end-title {
+        font-size: 26px;
+        font-weight: 800;
+        margin-bottom: 10px;
+      }
+      #le-feu-end.le-feu-defeat #le-feu-end-title {
+        color: #ff6b5e;
+      }
+      #le-feu-end.le-feu-victory #le-feu-end-title {
+        color: #ffd166;
+      }
+      #le-feu-end-msg {
+        font-size: 14px;
+        font-weight: 500;
+        color: #e8edf2;
+        line-height: 1.5;
+        margin-bottom: 20px;
+      }
+      #le-feu-end-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .le-feu-end-btn {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 16px;
+        font-weight: 800;
+        color: #0a1128;
+        padding: 12px 22px;
+        border-radius: 14px;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+      }
+      #le-feu-end-restart {
+        background: #ff9f1c;
+      }
+      #le-feu-end-continue {
+        background: #2ec4b6;
+      }
     </style>
   </head>
   <body>
@@ -484,6 +548,16 @@
         </div>
         <div id="le-feu-intro-obj">—</div>
         <button id="le-feu-intro-start" type="button">Commencer</button>
+      </div>
+    </div>
+    <div id="le-feu-end">
+      <div id="le-feu-end-card">
+        <div id="le-feu-end-title">—</div>
+        <div id="le-feu-end-msg">—</div>
+        <div id="le-feu-end-buttons">
+          <button class="le-feu-end-btn" id="le-feu-end-continue" type="button">Continuer</button>
+          <button class="le-feu-end-btn" id="le-feu-end-restart" type="button">Recommencer</button>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
