@@ -81,6 +81,11 @@ export const SPAWN_PLACE_TRIES = 4000; // rejection-sampling attempts
 export const NODE_COUNT = 5;
 export const NODE_BONUS_INCOME = 28; // Balance/sec per node currently owned
 export const NODE_MIN_DIST = 34; // min cell distance between nodes (and spawns)
+// Capturing a node's cell instantly claims a small DISTRICT around it (half-size
+// in cells). Makes a node a sticky, visibly-owned landmark instead of a lone
+// pixel you flip and lose without noticing. NODE_MIN_DIST ≫ this, so districts
+// never overlap or chain into another node.
+export const NODE_RADIUS = 2;
 
 // --- Win condition -------------------------------------------------------
 export const WIN_PERCENT = 0.5; // control this share of LAND to win the round

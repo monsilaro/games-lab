@@ -11,7 +11,14 @@ import { SIM_STEP, OWNER_PLAYER, WIN_PERCENT } from './config';
 import { createGrid, type Grid } from './grid';
 import { createSim, setTarget, setGreedyNeutral, simTick, clearDirty, type Sim } from './sim';
 import { aiStep } from './ai';
-import { createRenderer, renderFrame, clearFlash, layout, pointerToCell } from './render';
+import {
+  createRenderer,
+  renderFrame,
+  clearFlash,
+  layout,
+  pointerToCell,
+  flashNodeCapture,
+} from './render';
 import {
   initAudio,
   sfxCapture,
@@ -104,10 +111,14 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 // --- HUD + round overlay -------------------------------------------------
 const balEl = document.getElementById('emprise-hud-balance') as HTMLElement;
 const pctEl = document.getElementById('emprise-hud-percent') as HTMLElement;
-const rivalsEl = document.getElementById('emprise-hud-rivals') as HTMLElement;
+const nodesEl = document.getElementById('emprise-hud-nodes') as HTMLElement;
+const rankEl = document.getElementById('emprise-hud-rank') as HTMLElement;
 const fpsEl = document.getElementById('emprise-hud-fps') as HTMLElement;
+const progPlayerEl = document.getElementById('emprise-progress-player') as HTMLElement;
+const progRivalEl = document.getElementById('emprise-progress-rival') as HTMLElement;
 const hintEl = document.getElementById('emprise-hint') as HTMLElement | null;
 const hurtEl = document.getElementById('emprise-hurt') as HTMLElement | null;
+const gainEl = document.getElementById('emprise-gain') as HTMLElement | null;
 const overlayEl = document.getElementById('emprise-end-overlay') as HTMLElement;
 const endTitleEl = document.getElementById('emprise-end-title') as HTMLElement;
 const endSubEl = document.getElementById('emprise-end-sub') as HTMLElement;
@@ -132,6 +143,23 @@ function hurtFlash(): void {
   setTimeout(() => {
     hurtEl.style.opacity = '0';
   }, 60);
+}
+
+function gainFlash(): void {
+  if (!gainEl) return;
+  gainEl.style.opacity = '0.55';
+  setTimeout(() => {
+    gainEl.style.opacity = '0';
+  }, 70);
+}
+
+/** How many power nodes the player currently holds. */
+function playerNodes(): number {
+  let held = 0;
+  for (let n = 0; n < grid.nodes.length; n++) {
+    if (grid.owner[grid.nodes[n]] === OWNER_PLAYER) held++;
+  }
+  return held;
 }
 
 function snapshot(): { player: number; maxRival: number; rivals: number; rank: number } {
@@ -263,8 +291,15 @@ startGameLoop((dt) => {
     const snap = snapshot();
     balEl.textContent = Math.floor(grid.balance[OWNER_PLAYER]).toString();
     pctEl.textContent = `${((snap.player / landCount) * 100).toFixed(1)}%`;
-    rivalsEl.textContent = snap.rivals.toString();
+    nodesEl.textContent = `${playerNodes()}/${grid.nodes.length}`;
+    rankEl.textContent = `${snap.rank}/${totalPlayers}`;
+    rankEl.style.color = snap.rank > 1 ? '#ff5a5a' : '#ffd166'; // red = a rival leads you
     fpsEl.textContent = Math.round(fps).toString();
+
+    // Progress bars: share of the map vs the 50% win line (full bar = a win).
+    const winCells = landCount * WIN_PERCENT;
+    progPlayerEl.style.width = `${Math.min(100, (snap.player / winCells) * 100)}%`;
+    progRivalEl.style.width = `${Math.min(100, (snap.maxRival / winCells) * 100)}%`;
 
     if (running) {
       const delta = snap.player - lastPlayerOwned;
@@ -286,8 +321,11 @@ function checkNodes(): void {
     if (o === nodeOwners[n]) continue;
     const prev = nodeOwners[n];
     nodeOwners[n] = o;
-    if (o === OWNER_PLAYER) sfxNode();
-    else if (prev === OWNER_PLAYER) {
+    flashNodeCapture(renderer, n); // ring pop on any change of hands
+    if (o === OWNER_PLAYER) {
+      sfxNode();
+      gainFlash();
+    } else if (prev === OWNER_PLAYER) {
       sfxUnderAttack();
       hurtFlash();
     }
