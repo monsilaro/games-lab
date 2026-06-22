@@ -1,0 +1,15 @@
+{
+  "name": "Boulon",
+  "short_name": "Boulon",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#e9edf2",
+  "theme_color": "#ffb627",
+  "icons": [
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
