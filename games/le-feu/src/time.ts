@@ -77,7 +77,13 @@ const lerp = THREE.MathUtils.lerp;
  * Push `daylight` onto the actual lights + sky. `flickerT` is a free-running
  * real-time clock (seconds) so the fire pulses smoothly regardless of sim speed.
  */
-export function applyLighting(app: OrthoApp, rig: SceneRig, daylight: number, flickerT: number): void {
+export function applyLighting(
+  app: OrthoApp,
+  rig: SceneRig,
+  daylight: number,
+  flickerT: number,
+  fireStrength: number,
+): void {
   const m = LIGHTS.moon;
   rig.moon.intensity = lerp(m.nightIntensity, m.dayIntensity, daylight);
 
@@ -86,9 +92,12 @@ export function applyLighting(app: OrthoApp, rig: SceneRig, daylight: number, fl
   _amb.lerpColors(_ambNight, _ambDay, daylight);
   rig.ambient.color.copy(_amb);
 
+  // The hearth dims and its reach shortens as fuel runs low (the dark closes in).
   const f = LIGHTS.fire;
   const flicker = 1 + Math.sin(flickerT * Math.PI * 2 * f.flickerHz) * f.flickerAmp;
-  rig.fireLight.intensity = lerp(f.nightIntensity, f.dayIntensity, daylight) * flicker;
+  const strengthMul = 0.3 + 0.7 * fireStrength;
+  rig.fireLight.intensity = lerp(f.nightIntensity, f.dayIntensity, daylight) * flicker * strengthMul;
+  rig.fireLight.distance = f.distance * (0.5 + 0.5 * fireStrength);
 
   _sky.lerpColors(_skyNight, _skyDay, daylight);
   app.renderer.setClearColor(_sky);

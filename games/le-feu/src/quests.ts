@@ -67,6 +67,12 @@ export const QUESTS: readonly Quest[] = [
     done: (s) => s.pop >= QUEST_TUNING.popTarget,
   },
   {
+    id: 'reserve',
+    title: 'Du bois pour les nuits',
+    desc: `Constitue une réserve de ${QUEST_TUNING.woodReserve} bois — le feu en brûle la nuit pour repousser les ombres.`,
+    done: (s) => (s.counts.wood ?? 0) >= QUEST_TUNING.woodReserve,
+  },
+  {
     id: 'survivre',
     title: 'Tenir la saison',
     desc: `Garde le feu vivant jusqu'au Jour ${QUEST_TUNING.dayTarget}.`,

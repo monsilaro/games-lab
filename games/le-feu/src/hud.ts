@@ -40,6 +40,7 @@ export interface Hud {
   openSheet(building: BuildingInstance): void;
   refreshSheet(building: BuildingInstance, idle: number): void;
   closeSheet(): void;
+  setFire(fuel: number, max: number, warn: boolean): void;
   updateMarkers(items: MarkerItem[]): void;
   setQuest(quest: Quest | null, stepLabel: string): void;
   questToast(quest: Quest): void;
@@ -99,7 +100,11 @@ export function createHud(cb: HudCallbacks): Hud {
   const idleSpan = document.createElement('span');
   idleSpan.className = 'le-feu-res';
   resBar.appendChild(idleSpan);
+  const fireSpan = document.createElement('span');
+  fireSpan.className = 'le-feu-res';
+  resBar.appendChild(fireSpan);
   const famineEl = el('le-feu-famine');
+  const fireWarnEl = el('le-feu-fire-warn');
 
   // --- Build picker (one button per buildable, generated from config) ---
   const pickerEl = el('le-feu-picker');
@@ -204,6 +209,11 @@ export function createHud(cb: HudCallbacks): Hud {
     },
     closeSheet() {
       sheetEl.style.display = 'none';
+    },
+    setFire(fuel, max, warn) {
+      fireSpan.textContent = `🔥 ${Math.floor(fuel)}/${max}`;
+      fireSpan.classList.toggle('le-feu-low', warn);
+      fireWarnEl.style.display = warn ? 'block' : 'none';
     },
     updateMarkers(items) {
       for (let i = 0; i < items.length; i++) {

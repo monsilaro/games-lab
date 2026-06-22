@@ -324,9 +324,44 @@ export const AURORA_FX = {
   maxOpacity: 0.55, // opacity at full night
 } as const;
 
-// --- Quest tuning (Phase 3) ------------------------------------------------
+// --- Hearth: the fire as a survival mechanic (Phase 4) ---------------------
+// The fire burns fuel continuously and tops itself up from the WOOD store (the
+// villagers tend it implicitly). By day the bûcherons keep wood flowing; at night
+// nobody gathers, so the fire lives off the stockpile. Run out of wood and the
+// fuel drains — the protective light ring shrinks and the dark creeps in.
+export const HEARTH = {
+  maxFuel: 100,
+  startFuel: 70,
+  burnDay: 0.3, // fuel/sec by day (embers tick over while villagers gather)
+  burnNight: 1.1, // fuel/sec at night (the fire works hard to hold back the dark)
+  refuelPerSec: 2.4, // fuel pulled from wood each sim-second (while wood remains)
+  woodPerFuel: 0.5, // wood cost per unit of fuel refuelled
+  minRadius: 2.0, // protective light radius at empty fuel (inside the huddle ring)
+  maxRadius: 6.5, // protective light radius at full fuel
+  lowFrac: 0.3, // below this fuel fraction the HUD warns at night
+} as const;
+
+// --- Night threats: shades from the dark (Phase 4) -------------------------
+// Faceted "shades" with glowing violet eyes prowl in from the island edge each
+// night and halt at the fire's light ring. While the fire is strong they can't
+// reach the camp; when it weakens they slip inside the ring and grab a villager.
+export const THREAT = {
+  graceDays: 1, // no shades until after this day (let the player learn first)
+  base: 2, // shades on the first threatened night
+  perDay: 1, // +this many per day after
+  maxCount: 8, // hard cap on simultaneous shades
+  speed: 1.15, // world units / sec
+  prowl: 0.6, // tangential drift (rad/sec) once stopped at the light ring
+  spawnInterval: 1.8, // sim-seconds between arrivals during a night
+  spawnRadius: 13.5, // they appear just off the island edge (island R ≈ 12)
+  attackDist: 1.1, // within this of a villager → grab (kill) and flee
+  fleeRadius: 16, // run back out to here, then despawn
+} as const;
+
+// --- Quest tuning (Phase 3/4) ----------------------------------------------
 // Numeric targets for the onboarding quest chain (predicates carry no magics).
 export const QUEST_TUNING = {
   popTarget: 10, // "grow the camp" objective
+  woodReserve: 30, // "stockpile wood for the night" objective
   dayTarget: 5, // "survive to day N" objective
 } as const;

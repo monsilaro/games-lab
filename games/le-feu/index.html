@@ -108,6 +108,32 @@
         display: none;
         pointer-events: none;
       }
+      #le-feu-fire-warn {
+        position: fixed;
+        z-index: 11;
+        top: calc(env(safe-area-inset-top, 0px) + 156px);
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 14px;
+        font-weight: 800;
+        color: #0a1128;
+        background: #ff9f1c;
+        padding: 5px 14px;
+        border-radius: 999px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        display: none;
+        pointer-events: none;
+        animation: le-feu-pulse 1s ease-in-out infinite;
+      }
+      @keyframes le-feu-pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.55;
+        }
+      }
       /* World-anchored markers (recruit "!", idle building "💤"). */
       #le-feu-markers {
         position: fixed;
@@ -426,6 +452,7 @@
     </div>
     <div id="le-feu-quest-toast"></div>
     <div id="le-feu-famine">⚠️ Famine</div>
+    <div id="le-feu-fire-warn">🔥 Le feu faiblit !</div>
     <div id="le-feu-picker"></div>
     <div id="le-feu-sheet">
       <button id="le-feu-sheet-close" type="button">✕</button>

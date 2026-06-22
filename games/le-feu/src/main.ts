@@ -4,7 +4,7 @@
 // arrive at the fire to join. Building-centric assignment (tap a building → +/−).
 import * as THREE from 'three';
 import { createOrthoApp, startGameLoop } from '@games-lab/shared';
-import { SIM_STEP, MAX_STEPS_PER_FRAME, PALETTE, CAMERA, BUILD_ORDER, type BuildingKind } from './config';
+import { SIM_STEP, MAX_STEPS_PER_FRAME, PALETTE, CAMERA, BUILD_ORDER, HEARTH, type BuildingKind } from './config';
 import { setupScene, scatterDecor } from './scene';
 import { createCameraController } from './camera';
 import { createGrid, screenToCell, setOccupied, type Cell } from './grid';
@@ -17,6 +17,9 @@ import { assignNearestIdle, unassign, unassignOne } from './village/jobs';
 import { createRecruiter, tickRecruit, population, popCap } from './village/recruit';
 import { createHud, type MarkerItem } from './hud';
 import { createQuestState, tickQuests, currentQuest, QUESTS, type QuestSnapshot } from './quests';
+import { createHearth, tickHearth, fireStrength, fireRadius, isFireLow } from './hearth';
+import { createThreats, tickThreats, updateThreatVisuals } from './threats';
+import type { Villager } from './village/villager';
 
 // --- Boot ------------------------------------------------------------------
 const app = createOrthoApp({ worldHeight: CAMERA.seedHeight, clearColor: PALETTE.night });
@@ -36,6 +39,8 @@ const store = createStore();
 const buildings = createBuildings(app.scene);
 const village = createVillage(app.scene, grid);
 const recruiter = createRecruiter();
+const hearth = createHearth();
+const threats = createThreats(app.scene);
 
 const clock = createClock();
 const questState = createQuestState();
@@ -70,17 +75,20 @@ function buildSnapshot(): QuestSnapshot {
   };
 }
 
-/** Permanent death from famine: free their job, drop them from the world. */
-function killOne(): void {
-  // Prefer an idle colonist; otherwise take any non-wanderer.
-  let victim = village.villagers.find((v) => !v.job && !v.recruiting);
-  if (!victim) victim = village.villagers.find((v) => !v.recruiting);
-  if (!victim) return;
+/** Remove a specific villager from the world (frees their job first). */
+function killVillager(victim: Villager): void {
   if (victim.job) unassign(victim);
   village.group.remove(victim.root);
   const i = village.villagers.indexOf(victim);
   if (i >= 0) village.villagers.splice(i, 1);
   if (selectedBuilding) hud.refreshSheet(selectedBuilding, idleCount());
+}
+
+/** Permanent death from famine: prefer an idle colonist, else any non-wanderer. */
+function killOne(): void {
+  let victim = village.villagers.find((v) => !v.job && !v.recruiting);
+  if (!victim) victim = village.villagers.find((v) => !v.recruiting);
+  if (victim) killVillager(victim);
 }
 
 // --- HUD + control state ---------------------------------------------------
@@ -281,6 +289,9 @@ startGameLoop((dt) => {
     tickClock(clock, SIM_STEP);
     tickVillage(village, grid, clock, SIM_STEP, buildings, store);
     tickRecruit(recruiter, village, grid, SIM_STEP, buildings.houseCapacity());
+    const isNight = isNightForVillagers(clock);
+    tickHearth(hearth, store, SIM_STEP, isNight);
+    tickThreats(threats, village, clock, SIM_STEP, fireRadius(hearth), killVillager);
     if (consumeFood(store, population(village), SIM_STEP)) killOne();
     acc -= SIM_STEP;
     steps++;
@@ -289,10 +300,12 @@ startGameLoop((dt) => {
 
   // Render-rate visuals (independent of sim step).
   const daylight = daylightOf(clock);
-  applyLighting(app, rig, daylight, flickerT);
-  fire.update(flickerT, dt);
+  const strength = fireStrength(hearth);
+  applyLighting(app, rig, daylight, flickerT, strength);
+  fire.update(flickerT, dt, strength, fireRadius(hearth));
   const night = isNightForVillagers(clock);
   updateVillageVisuals(village, flickerT, dt, night, speedMul > 0);
+  updateThreatVisuals(threats, flickerT);
   app.renderer.render(app.scene, app.camera);
 
   hudT += dt;
@@ -301,6 +314,7 @@ startGameLoop((dt) => {
     hud.setClock(clock.day, phaseLabel(phaseOf(clock)));
     const pop = population(village);
     hud.setStatus(store, pop, popCap(buildings.houseCapacity()), idleCount(), isStarving(store));
+    hud.setFire(hearth.fuel, HEARTH.maxFuel, isNightForVillagers(clock) && isFireLow(hearth));
     if (selectedBuilding) hud.refreshSheet(selectedBuilding, idleCount());
     hud.updateMarkers(projectMarkers());
 

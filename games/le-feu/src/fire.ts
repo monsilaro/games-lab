@@ -8,8 +8,12 @@ import { PALETTE, LIGHTS, FIRE_FX } from './config';
 
 export interface Fire {
   group: THREE.Group;
-  /** t = free-running real seconds (flicker), dt = real delta (ember motion). */
-  update(t: number, dt: number): void;
+  /**
+   * t = free-running real seconds (flicker), dt = real delta (ember motion),
+   * strength = fuel 0..1, radius = the protective light ring radius (world units,
+   * so the glow disc visually matches where shades are held back).
+   */
+  update(t: number, dt: number, strength: number, radius: number): void;
 }
 
 function emissive(color: number, intensity: number, opacity = 1): THREE.MeshLambertMaterial {
@@ -114,19 +118,24 @@ export function createFire(): Fire {
   const f = LIGHTS.fire;
   return {
     group,
-    update(t: number, dt: number) {
+    update(t: number, dt: number, strength: number, radius: number) {
       // Breathing flicker — two out-of-phase sines so it never looks periodic.
       const a = Math.sin(t * Math.PI * 2 * f.flickerHz) * 0.5;
       const b = Math.sin(t * Math.PI * 2 * f.flickerHz * 0.37 + 1.3) * 0.5;
       const s = 1 + (a + b) * f.flickerAmp;
-      outer.scale.set(1 + b * 0.06, s, 1 + b * 0.06);
-      inner.scale.set(1, 1 + a * f.flickerAmp * 1.4, 1);
-      core.scale.y = 1 + a * 0.2;
+      // Flames shrink as the fire weakens (low fuel = a guttering flame).
+      const fs = 0.4 + 0.6 * strength;
+      outer.scale.set((1 + b * 0.06) * fs, s * fs, (1 + b * 0.06) * fs);
+      inner.scale.set(fs, (1 + a * f.flickerAmp * 1.4) * fs, fs);
+      core.scale.set(fs, (1 + a * 0.2) * fs, fs);
       outer.rotation.y = t * 0.6;
       inner.rotation.y = -t * 0.9;
-      glowMat.opacity = FIRE_FX.glowIntensity * (1 + (a + b) * 0.5);
+      // Glow disc spans the protective ring so the lit ground = where shades stop.
+      glow.scale.setScalar(radius / FIRE_FX.glowRadius);
+      glowMat.opacity = FIRE_FX.glowIntensity * (0.5 + 0.5 * strength) * (1 + (a + b) * 0.5);
 
       // Embers: rise, curl, fade (additive → dimming colour reads as a fade-out).
+      const emberK = 0.35 + 0.65 * strength; // fewer/dimmer embers when weak
       const d = Math.min(dt, 0.05); // clamp so a stalled tab doesn't teleport them
       for (let i = 0; i < N; i++) {
         let lf = life[i]! - d;
@@ -140,7 +149,7 @@ export function createFire(): Fire {
         positions[o + 1] = positions[o + 1]! + vy[i]! * d;
         positions[o] = positions[o]! + Math.sin(ph) * FIRE_FX.emberDrift * d;
         positions[o + 2] = positions[o + 2]! + Math.cos(ph) * FIRE_FX.emberDrift * d;
-        const k = Math.max(0, lf / maxLife[i]!);
+        const k = Math.max(0, lf / maxLife[i]!) * emberK;
         colors[o] = hot.r * k;
         colors[o + 1] = hot.g * k;
         colors[o + 2] = hot.b * k;
