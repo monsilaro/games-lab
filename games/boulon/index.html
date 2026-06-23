@@ -42,7 +42,6 @@
         z-index: 0;
       }
 
-      /* Top HUD: height (score) centre, level left, HP right. */
       .boulon-hud {
         position: fixed;
         z-index: 10;
@@ -54,58 +53,67 @@
         justify-content: space-between;
         padding: 0 16px;
         pointer-events: none;
-        text-shadow: 0 2px 0 rgba(255, 255, 255, 0.5);
+        text-shadow: 0 2px 0 rgba(255, 255, 255, 0.55);
       }
-      #boulon-hud-level {
+      #boulon-hud-room {
+        font-size: 16px;
+        font-weight: 900;
+        color: #1f5fc0;
+        min-width: 70px;
+      }
+      #boulon-hud-enemies {
         font-size: 15px;
         font-weight: 800;
-        color: #5b6478;
-        min-width: 64px;
-      }
-      #boulon-hud-height {
-        font-size: 24px;
-        font-weight: 900;
-        font-variant-numeric: tabular-nums;
-        color: #1f5fc0;
+        color: #c62828;
       }
       #boulon-hud-hp {
-        font-size: 16px;
-        letter-spacing: 1px;
-        min-width: 64px;
+        font-size: 15px;
+        min-width: 70px;
         text-align: right;
+        letter-spacing: 1px;
       }
-
-      /* Centre "Niveau N" banner, fades from JS. */
-      #boulon-banner {
+      #boulon-hud-upgrades {
         position: fixed;
-        z-index: 11;
-        top: 40%;
+        z-index: 10;
+        top: calc(env(safe-area-inset-top, 0px) + 40px);
         left: 0;
         right: 0;
         text-align: center;
-        font-size: 34px;
+        font-size: 16px;
+        letter-spacing: 2px;
+        pointer-events: none;
+      }
+
+      #boulon-banner {
+        position: fixed;
+        z-index: 11;
+        top: 38%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 30px;
         font-weight: 900;
         color: #1f5fc0;
         text-shadow: 0 3px 0 rgba(255, 255, 255, 0.6);
         opacity: 0;
-        transition: opacity 0.4s ease;
+        transition: opacity 0.35s ease;
         pointer-events: none;
       }
 
-      /* First-run hint, fades on first touch. */
       #boulon-hint {
         position: fixed;
         z-index: 10;
         left: 50%;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 36px);
         transform: translateX(-50%);
         padding: 9px 16px;
-        background: rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.72);
         border: 1px solid rgba(40, 47, 58, 0.14);
         border-radius: 999px;
-        font-size: 14px;
+        font-size: 13px;
         color: #2a2f3a;
-        white-space: nowrap;
+        text-align: center;
+        max-width: 86vw;
         pointer-events: none;
         transition: opacity 0.5s ease;
       }
@@ -121,7 +129,6 @@
         pointer-events: none;
       }
 
-      /* Game-over overlay, hidden by default. */
       .boulon-end {
         position: fixed;
         inset: 0;
@@ -177,7 +184,6 @@
         border: none;
         border-radius: 999px;
         cursor: pointer;
-        -webkit-tap-highlight-color: transparent;
       }
       #boulon-restart-btn:active {
         transform: scale(0.97);
@@ -193,7 +199,6 @@
         border: 2px solid rgba(47, 127, 237, 0.5);
         border-radius: 999px;
         cursor: pointer;
-        -webkit-tap-highlight-color: transparent;
       }
       #boulon-leaderboard-btn:active {
         transform: scale(0.97);
@@ -203,17 +208,18 @@
   </head>
   <body>
     <div class="boulon-hud">
-      <span id="boulon-hud-level">Niv. 1</span>
-      <span id="boulon-hud-height">0 m</span>
+      <span id="boulon-hud-room">Salle 1</span>
+      <span id="boulon-hud-enemies">☠️ 0</span>
       <span id="boulon-hud-hp">🔩🔩🔩🔩🔩</span>
     </div>
+    <div id="boulon-hud-upgrades"></div>
     <div id="boulon-banner"></div>
-    <div id="boulon-hint">Glisse pour piloter · tir auto · monte le plus haut</div>
+    <div id="boulon-hint">Glisse pour piloter · tir auto · nettoie la salle avant que le sol t'écrase</div>
     <div id="boulon-build-stamp"></div>
 
     <div class="boulon-end" id="boulon-end-overlay">
-      <h2 id="boulon-end-title">Chute</h2>
-      <p id="boulon-end-sub">Tu as grimpé 0 m</p>
+      <h2>Game Over</h2>
+      <p id="boulon-end-sub">Écrasé !</p>
       <p id="boulon-end-score">Score 0</p>
       <div class="boulon-end-btns">
         <button id="boulon-restart-btn">Rejouer</button>

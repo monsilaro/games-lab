@@ -7,7 +7,7 @@
 // Desktop fallback (iteration only): hold the mouse to steer the same way.
 
 import * as THREE from 'three';
-import { WINDOW } from './config';
+import { FOLLOW } from './config';
 
 export class Follow {
   /** True while a thumb/mouse is down and steering. */
@@ -35,7 +35,7 @@ export class Follow {
     this.ray.setFromCamera(this.ndc, this.camera);
     if (this.ray.ray.intersectPlane(this.plane, this.hit)) {
       this.target.x = this.hit.x;
-      this.target.y = this.hit.z - WINDOW.followOffset; // float above the finger (−y = up-screen)
+      this.target.y = this.hit.z - FOLLOW.offset; // float above the finger (−y = up-screen)
     }
   }
 

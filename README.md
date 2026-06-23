@@ -29,7 +29,7 @@ From prompt to playable build on device in about a minute.
 |Space Invaders|Classic arcade shooter — drag to move, tap to fire, defeat waves of aliens|[▶️](https://monsilaro.github.io/games-lab/space-invaders/)|
 |Emprise|Pixel territorial conquest (territorial.io-like) — touch & drag to flood-fill an empire over a 40k-cell grid|[▶️](https://monsilaro.github.io/games-lab/emprise/)|
 |Le Feu|Colony sim of survival around the campfire (Bonfire-like) — Québécois folklore, day/night cycle, pan/pinch diorama. Resources & jobs, guided quest progression, and a feed-the-fire night-threat loop (shades held back by the firelight)|[▶️](https://monsilaro.github.io/games-lab/le-feu/)|
-|Boulon|Voxel tower climber — a forced-scroll vertical shmup: finger-follow to dodge, auto-fire upward, climb the tower as high as you can|[▶️](https://monsilaro.github.io/games-lab/boulon/)|
+|Boulon|Voxel room-by-room tower climber — clear each room's static robots to open the gate, dodge the rising crusher, grab upgrades, climb|[▶️](https://monsilaro.github.io/games-lab/boulon/)|
 
 *(New prototypes appear on the arcade index automatically.)*
 

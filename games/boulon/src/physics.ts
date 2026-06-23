@@ -25,12 +25,14 @@ const sleepTuning = Sleeping as unknown as {
 sleepTuning._motionSleepThreshold = 2e-5; // sleep below ~0.27 units/s sustained
 sleepTuning._motionWakeThreshold = 4e-4; // wake when hit at > ~1.2 units/s
 
-// Collision categories so projectiles ignore the player, etc.
+// Collision categories. `wall` covers all solid environment (side walls,
+// pillars, the closed gate, and the rising crusher slab).
 export const CAT = {
-  rail: 0x0001,
+  wall: 0x0001,
   player: 0x0002,
   projectile: 0x0004,
   enemy: 0x0008,
+  item: 0x0010,
 } as const;
 
 // Matter velocities are per-tick (normalised to 16.666 ms); the game thinks in

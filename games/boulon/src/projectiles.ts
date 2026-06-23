@@ -1,6 +1,6 @@
-// Pooled voxel bolts. Pre-allocated bodies + meshes (zero allocation per shot,
-// per the spec). Fire respects the weapon cadence; bolts despawn on lifetime,
-// or when main.ts reports a hit, and return to the pool.
+// Pooled voxel bolts. Pre-allocated bodies + meshes (zero allocation per shot).
+// Cadence + aim live in main.ts now (auto-aim + multishot); this just spawns,
+// ages, and despawns. Bolts are sensors that report hits on enemies/walls.
 
 import * as THREE from 'three';
 import Matter from 'matter-js';
@@ -19,51 +19,36 @@ interface Bolt {
 export class Projectiles {
   private readonly pool: Bolt[] = [];
   private readonly byBodyId = new Map<number, Bolt>();
-  private cooldown = 0;
 
   constructor(scene: THREE.Scene) {
-    const geo = new THREE.BoxGeometry(
-      C.WEAPON.projectileRadius * 2, C.WEAPON.projectileRadius * 2, C.WEAPON.projectileRadius * 2,
-    );
+    const s = C.WEAPON.projectileRadius * 2;
+    const geo = new THREE.BoxGeometry(s, s, s);
     const mat = new THREE.MeshLambertMaterial({ color: C.PALETTE.projectile, flatShading: true });
     for (let i = 0; i < C.WEAPON.poolSize; i++) {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.visible = false;
-      mesh.position.y = 0.6; // float a little above the floor
+      mesh.position.y = 0.6;
       scene.add(mesh);
       const body = Bodies.circle(0, 0, C.WEAPON.projectileRadius, {
         label: 'projectile',
         frictionAir: 0,
-        isSensor: true, // detect hits without bouncing; despawn on contact
-        collisionFilter: { category: CAT.projectile, mask: CAT.enemy },
+        isSensor: true,
+        collisionFilter: { category: CAT.projectile, mask: CAT.enemy | CAT.wall },
       });
-      const bolt: Bolt = { body, mesh, alive: false, ttl: 0 };
-      this.pool.push(bolt);
+      this.pool.push({ body, mesh, alive: false, ttl: 0 });
     }
   }
 
-  /** Count down the cadence timer; call once per frame. */
-  tick(dt: number): void {
-    if (this.cooldown > 0) this.cooldown -= dt;
-    for (const b of this.pool) {
-      if (!b.alive) continue;
-      b.ttl -= dt;
-      if (b.ttl <= 0) this.retire(b);
-    }
-  }
-
-  /** Fire from the muzzle if the cadence allows. No-op while on cooldown. */
-  fire(x: number, y: number, dirX: number, dirY: number): void {
-    if (this.cooldown > 0) return;
+  /** Spawn one bolt at (x, y) heading in unit dir (dx, dy). Drops if pool full. */
+  spawn(x: number, y: number, dx: number, dy: number): void {
     const bolt = this.pool.find((b) => !b.alive);
-    if (!bolt) return; // pool exhausted — drop the shot rather than allocate
-    this.cooldown = C.WEAPON.fireInterval;
+    if (!bolt) return;
     bolt.alive = true;
     bolt.ttl = C.WEAPON.projectileLife;
     Body.setPosition(bolt.body, { x, y });
     Body.setVelocity(bolt.body, {
-      x: toTick(dirX * C.WEAPON.projectileSpeed),
-      y: toTick(dirY * C.WEAPON.projectileSpeed),
+      x: toTick(dx * C.WEAPON.projectileSpeed),
+      y: toTick(dy * C.WEAPON.projectileSpeed),
     });
     if (bolt.body.isSleeping) Sleeping.set(bolt.body, false);
     bolt.mesh.visible = true;
@@ -71,12 +56,23 @@ export class Projectiles {
     this.byBodyId.set(bolt.body.id, bolt);
   }
 
-  /** Despawn the bolt with this matter body, if it's one of ours. */
+  tick(dt: number): void {
+    for (const b of this.pool) {
+      if (!b.alive) continue;
+      b.ttl -= dt;
+      if (b.ttl <= 0) this.retire(b);
+    }
+  }
+
   despawnByBody(bodyId: number): boolean {
     const bolt = this.byBodyId.get(bodyId);
     if (!bolt || !bolt.alive) return false;
     this.retire(bolt);
     return true;
+  }
+
+  reset(): void {
+    for (const b of this.pool) if (b.alive) this.retire(b);
   }
 
   private retire(bolt: Bolt): void {

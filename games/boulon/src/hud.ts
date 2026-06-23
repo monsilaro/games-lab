@@ -1,11 +1,11 @@
-// Tower-climber HUD: live height (the score), current level, an HP pip row, and
-// a transient "Niveau N" banner. Plain DOM, all ids prefixed `boulon-` (the
-// repo's ad-block rule).
+// Room-climber HUD: room number, enemies remaining, HP pips, collected-upgrade
+// icons, and a transient banner. Plain DOM, ids prefixed `boulon-`.
 
 export class Hud {
-  private readonly heightEl = byId('boulon-hud-height');
-  private readonly levelEl = byId('boulon-hud-level');
+  private readonly roomEl = byId('boulon-hud-room');
+  private readonly enemiesEl = byId('boulon-hud-enemies');
   private readonly hpEl = byId('boulon-hud-hp');
+  private readonly upgradesEl = byId('boulon-hud-upgrades');
   private readonly bannerEl = byId('boulon-banner');
   private bannerT = 0;
 
@@ -14,12 +14,12 @@ export class Hud {
     if (stamp) stamp.textContent = buildInfo;
   }
 
-  setHeight(h: number): void {
-    this.heightEl.textContent = `${Math.floor(h)} m`;
+  setRoom(n: number): void {
+    this.roomEl.textContent = `Salle ${n}`;
   }
 
-  setLevel(level: number): void {
-    this.levelEl.textContent = `Niv. ${level}`;
+  setEnemies(n: number): void {
+    this.enemiesEl.textContent = n > 0 ? `☠️ ${n}` : '✅ sortie ouverte';
   }
 
   setHp(hp: number, max: number): void {
@@ -28,10 +28,14 @@ export class Hud {
     this.hpEl.textContent = s;
   }
 
+  setUpgrades(icons: string): void {
+    this.upgradesEl.textContent = icons;
+  }
+
   banner(text: string): void {
     this.bannerEl.textContent = text;
     this.bannerEl.style.opacity = '1';
-    this.bannerT = 1.4;
+    this.bannerT = 1.3;
   }
 
   tick(dt: number): void {

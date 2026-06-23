@@ -1,128 +1,142 @@
-// Boulon — all tuning lives here. No magic numbers in the systems (spec rule).
-// World units ≈ metres. The sim runs in the matter-js FLOOR plane: matter
-// (x, y) → three (x, 0, z). The camera is tilted ~50° so the floor reads as a
-// 3/4 voxel diorama. Gravity is OFF — motion is scripted, not falling.
+// Boulon — all tuning lives here. World units ≈ metres. The sim runs in the
+// matter-js FLOOR plane: matter (x, y) → three (x, 0, z), tilted ~50° so the
+// floor reads as a 3/4 voxel diorama. Gravity is OFF — motion is scripted.
 //
-// Vertical TOWER CLIMBER: you ascend a shaft toward matter −y (which the tilted
-// camera projects to the TOP of the screen). A forced scroll drags the view
-// upward; robots descend toward you; you auto-fire upward and climb as high as
-// you can. Each SECTION (a few screens tall) is a level that ramps difficulty.
+// ROOM-BY-ROOM TOWER CLIMBER: rooms stack along matter −y (= up the screen).
+// Each room has solid pillars, static enemies you must destroy to open the top
+// gate, two pickups, and a full-width floor that RISES (the crusher). Get
+// pinned between the rising floor and the ceiling/a pillar → instant death.
 
 import * as THREE from 'three';
 
 // --- Simulation -----------------------------------------------------------
-export const FIXED_DT = 1 / 60; // physics step (s); accumulator in physics.ts
-export const MAX_DT = 0.05; // clamp for the rAF loop (background-tab guard)
+export const FIXED_DT = 1 / 60;
+export const MAX_DT = 0.05;
 
-// --- Tower shaft -----------------------------------------------------------
-// Open-ended along matter −y (ascent). Side rails are visual only; the player
-// is clamped to ±LANE_HALF in code.
-export const LANE_HALF = 7; // playable half-width in x
-export const RAIL_THICKNESS = 0.8;
-export const RAIL_HEIGHT = 1.4;
+// --- Room geometry ---------------------------------------------------------
+// A room is bounded in x to ±LANE_HALF (solid side walls) and ROOM.height tall.
+// Room i bottom sits at matter y = -i*ROOM.height; the top (gate) is more −y.
+export const LANE_HALF = 8;
+export const WALL_THICKNESS = 0.8;
+export const WALL_HEIGHT = 1.8;
+export const ROOM = {
+  height: 30, // world units per room (≈ a screenful at this framing)
+  fitHalf: 15, // vertical half-extent the camera must show (tune framing)
+  marginX: 1.6, // extra world units past the rails kept on-screen
+  wallTop: 1.8,
+} as const;
 
-// --- Camera (follows the scroll; reuses Boulon's known-good 3/4 framing) ----
+// --- Camera (frames the current room; pans on room change) ----------------
 export const CAMERA = {
-  // Position relative to the look centre. atan(24/20) ≈ 50° tilt → 3/4 voxels.
-  offset: new THREE.Vector3(0, 24, 20),
-  // Horizontal world half-extent to keep visible (a bit past the rails).
-  fitRadius: LANE_HALF + 2,
-  depthFactor: 0.8, // floor-depth foreshortening (~sin tilt), used by input unproject
+  offset: new THREE.Vector3(0, 24, 16), // ~56° tilt
   far: 200,
+  panLerp: 3.2, // room-to-room camera pan stiffness
 } as const;
 
-// --- Forced scroll ---------------------------------------------------------
-// `frontY` (matter y of the camera look-centre) decreases over time; the climb
-// height score is −frontY. Speed ramps per level.
-export const SCROLL = {
-  baseSpeed: 3.2, // units/s at level 1
-  perLevelSpeed: 0.85, // added units/s per level cleared
-  maxSpeed: 14,
-} as const;
-
-// --- Player window (matter-y offsets relative to frontY) -------------------
-// +y = toward the camera = lower on screen. Falling past `deathBelow` (off the
-// bottom edge) ends the run.
-export const WINDOW = {
-  up: 7, // furthest the ship may climb above the look-centre (−y)
-  down: 12, // furthest below it may drift (+y, toward camera)
-  deathBelow: 15.5, // past this (off-screen bottom) = death
-  followOffset: 3.5, // ship floats this far above the finger (−y) so the thumb doesn't cover it
-} as const;
-
-// --- Levels / sections -----------------------------------------------------
-export const TOWER = {
-  sectionDepth: 64, // world units climbed per level (≈ 2–3 screens)
+// --- Crusher (rising floor) ------------------------------------------------
+export const CRUSHER = {
+  thickness: 2.4, // visual/physical height of the rising slab
+  baseSpeed: 1.5, // units/s rise at room 1
+  perRoomSpeed: 0.28, // added per room
+  maxSpeed: 6.5,
+  startDelay: 1.1, // s of grace after entering a room before it rises
+  crushMargin: 0.6, // overlap into the player (or gap-to-gate) that means death
 } as const;
 
 // --- Player ----------------------------------------------------------------
 export const PLAYER = {
-  radius: 0.7, // physics circle radius
-  scale: 0.5, // voxel mesh multiplier (smaller assets)
-  followLerp: 16, // position-lerp stiffness toward the finger target
+  radius: 0.7,
+  scale: 0.5,
+  seekGain: 13, // velocity = (target − pos) * seekGain, capped at maxSpeed
+  maxSpeed: 22, // units/s — responsive finger-follow
   hp: 5,
-  iframes: 1.0, // s of invulnerability after taking a hit
+  iframes: 0.9, // s invulnerable after an enemy graze
 };
 
-// --- Weapon / projectiles (auto-fire straight up = matter −y) --------------
+// --- Finger-follow input ---------------------------------------------------
+// The ship aims for a point this far ABOVE the finger (−y) so the thumb never
+// covers it.
+export const FOLLOW = { offset: 2.2 } as const;
+
+// --- Weapon (auto-fire, auto-aims the nearest enemy; else straight up) ------
 export const WEAPON = {
-  fireInterval: 0.15, // s between auto-shots
-  projectileSpeed: 34, // units/s
+  fireInterval: 0.2,
+  projectileSpeed: 30,
   projectileRadius: 0.22,
-  projectileLife: 1.4, // s before auto-despawn
+  projectileLife: 1.2,
   damage: 1,
-  muzzleOffset: 1.0, // spawn this far in front (−y) of the ship
-  poolSize: 96, // pre-allocated; zero alloc per shot
+  muzzleOffset: 0.9,
+  poolSize: 96,
+  autoAimRange: 30, // units; nearest enemy within this is targeted
+  spreadDeg: 11, // angle between bolts when MULTISHOT > 1
 };
 
-// --- Enemies (descending voxel robots) -------------------------------------
+// --- Enemies (static; destroy all to open the gate; contact hurts) ---------
 export const ENEMY = {
   radius: 0.7,
-  scale: 0.4, // smaller than the hero
+  scale: 0.42,
   hp: 2,
-  poolSize: 56,
-  baseSpeed: 4.5, // downward (+y) units/s at level 1
-  perLevelSpeed: 0.7,
-  maxSpeed: 16,
+  poolSize: 40,
   contactDamage: 1,
-  spawnInterval: 0.85, // s between spawns at level 1
-  spawnIntervalMin: 0.26,
-  perLevelSpawn: 0.07, // interval reduction per level
-  spawnAhead: 5, // spawn this far above the play window (extra −y beyond the top)
-  cullBelow: 5, // despawn once this far below the window bottom (+y)
-  score: 25, // points per kill
+  baseCount: 3, // enemies in room 1
+  perRoomCount: 0.8, // +per room
+  maxCount: 10,
+  placeMargin: 2.2, // keep this far inside the walls / off the gate & floor
+  minSpacing: 3.0, // min distance between enemies
 };
 
-// --- Debris budget (kill-burst of voxel cubes; kinematic, not matter) ------
+// --- Pickups (2 per room: easy + hard; grant a stacking run upgrade) -------
+export const ITEM = {
+  radius: 0.7, // pickup collection radius
+  scale: 0.5,
+  bobAmp: 0.25,
+  bobSpeed: 2.5,
+  spin: 1.6,
+} as const;
+
+// --- Upgrade magnitudes (see upgrades.ts) ----------------------------------
+export const UPGRADE = {
+  fireRateMul: 0.84, // FIRE_RATE: fireInterval *= this
+  speedMul: 1.12, // SPEED: maxSpeed *= this
+  damageAdd: 1, // DAMAGE: +damage
+  hpAdd: 1, // MAX_HP: +max hp (and heal 1)
+  multishotAdd: 1, // MULTISHOT: +1 bolt
+} as const;
+
+// --- Debris budget (kill-burst of voxel cubes; kinematic) ------------------
 export const DEBRIS = {
-  globalCap: 160, // max simultaneous debris cubes
-  perEnemy: 7, // cubes spawned per enemy death
-  lifetime: 0.7, // s before recycle (shrink-out)
+  globalCap: 160,
+  perEnemy: 7,
+  lifetime: 0.7,
   size: 0.3,
-  speed: 7, // outward burst speed (units/s)
-  gravity: 22, // downward (−world y) accel so cubes arc and settle
+  speed: 7,
+  gravity: 22,
 };
 
-// --- Palette (bright toy-robot world; band tints mark each level) ----------
+// --- Palette ---------------------------------------------------------------
 export const PALETTE = {
-  clear: 0xe9edf2, // sky/background
+  clear: 0xe9edf2,
   floor: 0xd7dde6,
   floorGrid: 0xc2cad6,
   rail: 0xb6c0cf,
-  hero: 0x2f7fed, // friendly blue robot
+  pillar: 0x9aa6b8,
+  gate: 0xff7043, // closed top gate (warning orange)
+  crusher: 0x5b6478, // the rising slab (heavy grey)
+  crusherEdge: 0xff5252, // its leading edge stripe (danger)
+  hero: 0x2f7fed,
   heroDark: 0x1f5fc0,
   heroAccent: 0xffd166,
   eye: 0x16324f,
-  projectile: 0xffb627, // warm bolt
-  enemy: 0xef5350, // red robots
+  projectile: 0xffb627,
+  enemy: 0xef5350,
   enemyDark: 0xc62828,
-  // Per-level floor band tints (cycled) so sections read as you climb.
-  bands: [0xd7dde6, 0xdbe6dd, 0xe6dedb, 0xdbdce6, 0xe6dbe2, 0xdbe5e6] as number[],
+  itemEasy: 0x35c46b, // green = easy pickup
+  itemHard: 0xffc107, // gold = hard pickup
 } as const;
 
 // --- Lighting (lit voxel exception — Lambert + flatShading; see scene.ts) --
 export const LIGHTS = {
   sun: { color: 0xfff4e0, intensity: 1.15, position: new THREE.Vector3(-8, 16, 6) },
-  ambient: { color: 0xbcd0e8, intensity: 0.78 },
-  fill: { color: 0xffe6c0, intensity: 6, distance: 40, decay: 1.4, position: new THREE.Vector3(0, 9, 4) },
+  ambient: { color: 0xbcd0e8, intensity: 0.8 },
+  fill: { color: 0xffe6c0, intensity: 6, distance: 44, decay: 1.4, position: new THREE.Vector3(0, 9, 4) },
 } as const;

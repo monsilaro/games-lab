@@ -1,27 +1,20 @@
-// Descending voxel-robot enemies. Pooled + recycled (zero alloc per spawn).
-// They spawn just above the play window and drift down (+y, toward the player /
-// camera) at a level-scaled speed. Sensors: they detect contact (player, bolts)
-// without physically shoving anything. Killed → main spawns a debris burst.
+// Static voxel-robot enemies. Solid obstacles you must destroy to clear a room;
+// touching one costs the player HP (handled in main via i-frames). Pooled +
+// recycled. main asks `nearestAlive` for the auto-aim target.
 
 import * as THREE from 'three';
 import Matter from 'matter-js';
 import * as C from './config';
-import { addBody, CAT, removeBody, toTick } from './physics';
+import { addBody, CAT, removeBody } from './physics';
 import { buildRobot } from './robotFactory';
 
-const { Bodies, Body, Sleeping } = Matter;
+const { Bodies } = Matter;
 
 interface Enemy {
   body: Matter.Body;
   mesh: THREE.Group;
   alive: boolean;
   hp: number;
-}
-
-export interface EnemyHit {
-  killed: boolean;
-  x: number;
-  y: number;
 }
 
 export class Enemies {
@@ -40,13 +33,8 @@ export class Enemies {
       built.group.visible = false;
       scene.add(built.group);
       const body = Bodies.circle(0, 0, C.ENEMY.radius, {
+        isStatic: true,
         label: 'enemy',
-        frictionAir: 0,
-        inertia: Infinity, // never spin from a graze
-        sleepThreshold: Infinity, // velocity-driven — must never sleep
-        // Non-sensor so collisionStart fires reliably (matches the original
-        // projectile→target pattern). Any physical shove is erased next frame:
-        // the player is re-positioned and enemy velocity is reset every tick.
         collisionFilter: { category: CAT.enemy, mask: CAT.player | CAT.projectile },
       });
       this.pool.push({ body, mesh: built.group, alive: false, hp: 0 });
@@ -59,55 +47,47 @@ export class Enemies {
     return n;
   }
 
-  private speed(level: number): number {
-    return Math.min(C.ENEMY.maxSpeed, C.ENEMY.baseSpeed + level * C.ENEMY.perLevelSpeed);
-  }
-
-  /** Spawn one enemy above the window, descending at the level's speed. */
-  spawn(frontY: number, level: number): void {
-    const e = this.pool.find((x) => !x.alive);
-    if (!e) return; // pool exhausted — skip rather than allocate
-    const x = (Math.random() * 2 - 1) * (C.LANE_HALF - C.ENEMY.radius);
-    const y = frontY - (C.WINDOW.up + C.ENEMY.spawnAhead);
+  /** Place one static enemy at matter (x, y). */
+  spawnAt(x: number, y: number): void {
+    const e = this.pool.find((x2) => !x2.alive);
+    if (!e) return;
     e.alive = true;
     e.hp = C.ENEMY.hp;
-    Body.setPosition(e.body, { x, y });
-    Body.setVelocity(e.body, { x: 0, y: toTick(this.speed(level)) }); // +y = downward
-    if (e.body.isSleeping) Sleeping.set(e.body, false);
+    Matter.Body.setPosition(e.body, { x, y });
+    e.mesh.position.set(x, 0, y);
+    e.mesh.rotation.y = 0; // faces +z = toward the player / camera
     e.mesh.visible = true;
-    addBody(e.body, e.mesh); // synced each frame by physics.syncMeshes
+    addBody(e.body); // static: positioned once, no per-frame sync
     this.byBodyId.set(e.body.id, e);
   }
 
-  /** Keep the descent speed current and cull anything below the window. */
-  update(frontY: number, level: number): void {
-    const v = toTick(this.speed(level));
-    const cull = frontY + C.WINDOW.down + C.ENEMY.cullBelow;
+  /** Nearest living enemy to (px, py) within range — the auto-aim target. */
+  nearestAlive(px: number, py: number, range: number): { x: number; y: number } | null {
+    let best: { x: number; y: number } | null = null;
+    let bestD = range * range;
     for (const e of this.pool) {
       if (!e.alive) continue;
-      if (e.body.velocity.y !== v) Body.setVelocity(e.body, { x: 0, y: v });
-      if (e.body.position.y > cull) this.retire(e);
+      const dx = e.body.position.x - px;
+      const dy = e.body.position.y - py;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = { x: e.body.position.x, y: e.body.position.y };
+      }
     }
+    return best;
   }
 
-  /** Damage the enemy with this body. Returns the outcome, or null if not ours. */
-  hitByBody(bodyId: number, dmg: number): EnemyHit | null {
+  /** Damage the enemy with this body. Returns kill outcome, or null. */
+  hitByBody(bodyId: number, dmg: number): { killed: boolean; x: number; y: number } | null {
     const e = this.byBodyId.get(bodyId);
     if (!e || !e.alive) return null;
     e.hp -= dmg;
-    const pos = { x: e.body.position.x, y: e.body.position.y };
-    if (e.hp > 0) return { killed: false, x: pos.x, y: pos.y };
+    const x = e.body.position.x;
+    const y = e.body.position.y;
+    if (e.hp > 0) return { killed: false, x, y };
     this.retire(e);
-    return { killed: true, x: pos.x, y: pos.y };
-  }
-
-  /** Remove the enemy with this body (e.g. it rammed the player). */
-  despawnByBody(bodyId: number): { x: number; y: number } | null {
-    const e = this.byBodyId.get(bodyId);
-    if (!e || !e.alive) return null;
-    const pos = { x: e.body.position.x, y: e.body.position.y };
-    this.retire(e);
-    return pos;
+    return { killed: true, x, y };
   }
 
   reset(): void {
