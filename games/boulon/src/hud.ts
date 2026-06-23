@@ -1,24 +1,44 @@
-// Minimal Phase 1 HUD: a kill counter and the build stamp. Grows into the
-// wave/score HUD in later phases.
+// Tower-climber HUD: live height (the score), current level, an HP pip row, and
+// a transient "Niveau N" banner. Plain DOM, all ids prefixed `boulon-` (the
+// repo's ad-block rule).
 
 export class Hud {
-  private readonly hudEl: HTMLElement;
-  private kills = 0;
+  private readonly heightEl = byId('boulon-hud-height');
+  private readonly levelEl = byId('boulon-hud-level');
+  private readonly hpEl = byId('boulon-hud-hp');
+  private readonly bannerEl = byId('boulon-banner');
+  private bannerT = 0;
 
   constructor(buildInfo: string) {
-    this.hudEl = byId('boulon-hud');
     const stamp = document.getElementById('boulon-build-stamp');
     if (stamp) stamp.textContent = buildInfo;
-    this.render();
   }
 
-  addKill(): void {
-    this.kills += 1;
-    this.render();
+  setHeight(h: number): void {
+    this.heightEl.textContent = `${Math.floor(h)} m`;
   }
 
-  private render(): void {
-    this.hudEl.textContent = `🔩 ${this.kills}`;
+  setLevel(level: number): void {
+    this.levelEl.textContent = `Niv. ${level}`;
+  }
+
+  setHp(hp: number, max: number): void {
+    let s = '';
+    for (let i = 0; i < max; i++) s += i < hp ? '🔩' : '·';
+    this.hpEl.textContent = s;
+  }
+
+  banner(text: string): void {
+    this.bannerEl.textContent = text;
+    this.bannerEl.style.opacity = '1';
+    this.bannerT = 1.4;
+  }
+
+  tick(dt: number): void {
+    if (this.bannerT > 0) {
+      this.bannerT -= dt;
+      if (this.bannerT <= 0) this.bannerEl.style.opacity = '0';
+    }
   }
 }
 

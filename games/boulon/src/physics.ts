@@ -27,10 +27,10 @@ sleepTuning._motionWakeThreshold = 4e-4; // wake when hit at > ~1.2 units/s
 
 // Collision categories so projectiles ignore the player, etc.
 export const CAT = {
-  wall: 0x0001,
+  rail: 0x0001,
   player: 0x0002,
   projectile: 0x0004,
-  target: 0x0008,
+  enemy: 0x0008,
 } as const;
 
 // Matter velocities are per-tick (normalised to 16.666 ms); the game thinks in

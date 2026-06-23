@@ -35,7 +35,7 @@ export class Projectiles {
         label: 'projectile',
         frictionAir: 0,
         isSensor: true, // detect hits without bouncing; despawn on contact
-        collisionFilter: { category: CAT.projectile, mask: CAT.wall | CAT.target },
+        collisionFilter: { category: CAT.projectile, mask: CAT.enemy },
       });
       const bolt: Bolt = { body, mesh, alive: false, ttl: 0 };
       this.pool.push(bolt);

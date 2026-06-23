@@ -10,7 +10,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Boulon" />
-    <meta name="theme-color" content="#ffb627" />
+    <meta name="theme-color" content="#e9edf2" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="icon" href="./apple-touch-icon.png" />
@@ -27,6 +27,7 @@
         overflow: hidden;
         overscroll-behavior: none;
         background: #e9edf2;
+        color: #2a2f3a;
         font-family: -apple-system, system-ui, sans-serif;
         -webkit-user-select: none;
         user-select: none;
@@ -40,75 +41,186 @@
         touch-action: none;
         z-index: 0;
       }
-      /* HUD: small kill/hit counter, top-centre. */
-      #boulon-hud {
+
+      /* Top HUD: height (score) centre, level left, HP right. */
+      .boulon-hud {
         position: fixed;
         z-index: 10;
-        top: calc(env(safe-area-inset-top, 0px) + 14px);
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        pointer-events: none;
+        text-shadow: 0 2px 0 rgba(255, 255, 255, 0.5);
+      }
+      #boulon-hud-level {
+        font-size: 15px;
+        font-weight: 800;
+        color: #5b6478;
+        min-width: 64px;
+      }
+      #boulon-hud-height {
+        font-size: 24px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        color: #1f5fc0;
+      }
+      #boulon-hud-hp {
+        font-size: 16px;
+        letter-spacing: 1px;
+        min-width: 64px;
+        text-align: right;
+      }
+
+      /* Centre "Niveau N" banner, fades from JS. */
+      #boulon-banner {
+        position: fixed;
+        z-index: 11;
+        top: 40%;
         left: 0;
         right: 0;
         text-align: center;
-        font-size: 22px;
-        font-weight: 800;
-        color: #2a2f3a;
-        text-shadow: 0 2px 0 rgba(255, 255, 255, 0.5);
+        font-size: 34px;
+        font-weight: 900;
+        color: #1f5fc0;
+        text-shadow: 0 3px 0 rgba(255, 255, 255, 0.6);
+        opacity: 0;
+        transition: opacity 0.4s ease;
         pointer-events: none;
       }
+
+      /* First-run hint, fades on first touch. */
+      #boulon-hint {
+        position: fixed;
+        z-index: 10;
+        left: 50%;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
+        transform: translateX(-50%);
+        padding: 9px 16px;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(40, 47, 58, 0.14);
+        border-radius: 999px;
+        font-size: 14px;
+        color: #2a2f3a;
+        white-space: nowrap;
+        pointer-events: none;
+        transition: opacity 0.5s ease;
+      }
+
       #boulon-build-stamp {
         position: fixed;
         z-index: 10;
         right: calc(env(safe-area-inset-right, 0px) + 8px);
-        top: calc(env(safe-area-inset-top, 0px) + 8px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
         font-size: 10px;
-        color: rgba(40, 47, 58, 0.45);
+        font-family: ui-monospace, monospace;
+        color: rgba(40, 47, 58, 0.4);
         pointer-events: none;
       }
-      /* Twin-stick virtual joysticks. Two independent floating sticks: the
-         base appears wherever the thumb lands, the knob tracks within radius.
-         Hidden until a thumb is down. */
-      .boulon-stick-base,
-      .boulon-stick-knob {
+
+      /* Game-over overlay, hidden by default. */
+      .boulon-end {
         position: fixed;
-        z-index: 12;
-        display: none;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+        background: rgba(233, 237, 242, 0.86);
+        backdrop-filter: blur(6px);
+        opacity: 0;
         pointer-events: none;
-        border-radius: 50%;
-        left: 0;
-        top: 0;
+        transition: opacity 0.35s ease;
       }
-      .boulon-stick-base {
-        width: 132px;
-        height: 132px;
-        margin: -66px 0 0 -66px;
-        border: 3px solid rgba(40, 47, 58, 0.18);
-        background: rgba(255, 255, 255, 0.16);
+      .boulon-end.boulon-end-active {
+        opacity: 1;
+        pointer-events: auto;
       }
-      .boulon-stick-knob {
-        width: 60px;
-        height: 60px;
-        margin: -30px 0 0 -30px;
-        background: rgba(255, 255, 255, 0.5);
-        border: 2px solid rgba(40, 47, 58, 0.28);
+      .boulon-end h2 {
+        font-size: 34px;
+        font-weight: 900;
+        color: #1f5fc0;
       }
-      /* Right (aim/fire) stick tinted warm so the two thumbs read distinctly. */
-      #boulon-stick-aim-base {
-        border-color: rgba(255, 110, 40, 0.45);
+      .boulon-end p {
+        font-size: 16px;
+        color: #5b6478;
+        max-width: 300px;
+        line-height: 1.5;
       }
-      #boulon-stick-aim-knob {
-        background: rgba(255, 150, 60, 0.55);
-        border-color: rgba(255, 110, 40, 0.6);
+      #boulon-end-score {
+        font-size: 28px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        color: #2a2f3a;
+      }
+      .boulon-end-btns {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 6px;
+      }
+      #boulon-restart-btn {
+        padding: 12px 30px;
+        font: inherit;
+        font-size: 17px;
+        font-weight: 800;
+        color: #fff;
+        background: #2f7fed;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #boulon-restart-btn:active {
+        transform: scale(0.97);
+        background: #1f5fc0;
+      }
+      #boulon-leaderboard-btn {
+        padding: 12px 24px;
+        font: inherit;
+        font-size: 16px;
+        font-weight: 800;
+        color: #1f5fc0;
+        background: transparent;
+        border: 2px solid rgba(47, 127, 237, 0.5);
+        border-radius: 999px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #boulon-leaderboard-btn:active {
+        transform: scale(0.97);
+        background: rgba(47, 127, 237, 0.1);
       }
     </style>
   </head>
   <body>
-    <div id="boulon-hud"></div>
+    <div class="boulon-hud">
+      <span id="boulon-hud-level">Niv. 1</span>
+      <span id="boulon-hud-height">0 m</span>
+      <span id="boulon-hud-hp">🔩🔩🔩🔩🔩</span>
+    </div>
+    <div id="boulon-banner"></div>
+    <div id="boulon-hint">Glisse pour piloter · tir auto · monte le plus haut</div>
     <div id="boulon-build-stamp"></div>
-    <!-- Left stick = move -->
-    <div id="boulon-stick-move-base" class="boulon-stick-base"></div>
-    <div id="boulon-stick-move-knob" class="boulon-stick-knob"></div>
-    <!-- Right stick = aim + fire -->
-    <div id="boulon-stick-aim-base" class="boulon-stick-base"></div>
-    <div id="boulon-stick-aim-knob" class="boulon-stick-knob"></div>
+
+    <div class="boulon-end" id="boulon-end-overlay">
+      <h2 id="boulon-end-title">Chute</h2>
+      <p id="boulon-end-sub">Tu as grimpé 0 m</p>
+      <p id="boulon-end-score">Score 0</p>
+      <div class="boulon-end-btns">
+        <button id="boulon-restart-btn">Rejouer</button>
+        <button id="boulon-leaderboard-btn">🏆 Classement</button>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
